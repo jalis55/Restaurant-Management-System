@@ -41,6 +41,17 @@ const routeCatalog = [
     highlights: ["Pending queue", "Service timing", "Completion trends"],
   },
   {
+    path: "/operations/orders/new",
+    label: "Create Order",
+    icon: ClipboardList,
+    section: "Operations",
+    roles: ADMIN_ROLES,
+    eyebrow: "Operations",
+    title: "Create Order",
+    description: "Open a fresh order fast, capture table details, and hand it off to the service flow immediately.",
+    highlights: ["Fast ticket entry", "Table assignment", "Service handoff"],
+  },
+  {
     path: "/operations/reservations",
     label: "Reservations",
     icon: ListChecks,

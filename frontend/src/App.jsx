@@ -47,6 +47,7 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route index element={<RoleHomeRoute />} />
           <Route path="operations/orders" element={<OperationsOrdersPage />} />
+          <Route path="operations/orders/new" element={<StaffNewOrderPage />} />
           <Route path="operations/reservations" element={<OperationsReservationsPage />} />
           <Route path="operations/tables" element={<OperationsTablesPage />} />
           <Route path="menu/items" element={<MenuItemsPage />} />
