@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsStaffRole
+from apps.accounts.permissions import CanCreateOrder, CanDeleteOrder, CanUpdateOrderStatus, CanViewOrders, IsAdminOrManager
 from apps.orders.models import Order, OrderStatus
 from apps.orders.serializers import OrderSerializer, OrderStatusUpdateSerializer
 
@@ -12,9 +12,21 @@ from apps.orders.serializers import OrderSerializer, OrderStatusUpdateSerializer
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.select_related("created_by").prefetch_related("items__menu_item").all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, IsStaffRole]
     search_fields = ["order_number", "notes", "created_by__username"]
     ordering_fields = ["created_at", "updated_at", "total_amount", "status"]
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve", "active", "kitchen"}:
+            permission_classes = [IsAuthenticated, CanViewOrders]
+        elif self.action == "create":
+            permission_classes = [IsAuthenticated, CanCreateOrder]
+        elif self.action == "update_status":
+            permission_classes = [IsAuthenticated, CanUpdateOrderStatus]
+        elif self.action == "destroy":
+            permission_classes = [IsAuthenticated, CanDeleteOrder]
+        else:
+            permission_classes = [IsAuthenticated, IsAdminOrManager]
+        return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
         serializer.save()

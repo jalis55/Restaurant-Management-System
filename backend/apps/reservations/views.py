@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsAdminOrManager, IsStaffRole
+from apps.accounts.permissions import CanDeleteReservation, CanManageReservations, CanReadTables, IsAdminOrManager
 from apps.reservations.models import Reservation, ReservationStatus, Table
 from apps.reservations.serializers import (
     ReservationSerializer,
@@ -18,9 +18,17 @@ from apps.reservations.serializers import (
 class ReservationViewSet(viewsets.ModelViewSet):
     queryset = Reservation.objects.select_related("table", "created_by").all()
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated, IsStaffRole]
     search_fields = ["guest_name", "guest_phone", "guest_email"]
     ordering_fields = ["reserved_at", "reserved_until", "created_at", "status"]
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve", "today", "create", "update", "partial_update", "update_status"}:
+            permission_classes = [IsAuthenticated, CanManageReservations]
+        elif self.action == "destroy":
+            permission_classes = [IsAuthenticated, CanDeleteReservation]
+        else:
+            permission_classes = [IsAuthenticated, CanManageReservations]
+        return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
         serializer.save()
@@ -50,7 +58,7 @@ class TableViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in {"list", "retrieve", "availability"}:
-            permission_classes = [IsAuthenticated, IsStaffRole]
+            permission_classes = [IsAuthenticated, CanReadTables]
         else:
             permission_classes = [IsAuthenticated, IsAdminOrManager]
         return [permission() for permission in permission_classes]

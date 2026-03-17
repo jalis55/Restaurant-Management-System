@@ -14,6 +14,8 @@ import {
 
 const ADMIN_ROLES = ["admin", "manager"];
 const STAFF_ROLES = ["waiter", "cashier", "kitchen"];
+const MENU_READ_ROLES = ["admin", "manager", "waiter", "kitchen"];
+const TABLE_READ_ROLES = ["admin", "manager", "waiter"];
 
 const routeCatalog = [
   {
@@ -54,7 +56,7 @@ const routeCatalog = [
     label: "Tables",
     icon: TableProperties,
     section: "Operations",
-    roles: ADMIN_ROLES,
+    roles: TABLE_READ_ROLES,
     eyebrow: "Operations",
     title: "Tables",
     description: "See room readiness, capacity usage, and which tables need the quickest turn-around.",
@@ -65,7 +67,7 @@ const routeCatalog = [
     label: "Items",
     icon: UtensilsCrossed,
     section: "Menu Management",
-    roles: ADMIN_ROLES,
+    roles: MENU_READ_ROLES,
     eyebrow: "Menu",
     title: "Menu Items",
     description: "Manage item availability, pricing, prep details, and what the floor can currently sell.",
@@ -76,7 +78,7 @@ const routeCatalog = [
     label: "Categories",
     icon: PackageSearch,
     section: "Menu Management",
-    roles: ADMIN_ROLES,
+    roles: MENU_READ_ROLES,
     eyebrow: "Menu",
     title: "Menu Categories",
     description: "Organize the structure of the menu so item groupings stay clean and fast to manage.",

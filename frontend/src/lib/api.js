@@ -136,6 +136,10 @@ async function createReservation(payload) {
   return apiRequest("/api/reservations/", { method: "POST", body: payload });
 }
 
+async function updateReservation(reservationId, payload) {
+  return apiRequest(`/api/reservations/${reservationId}/`, { method: "PATCH", body: payload });
+}
+
 async function updateReservationStatus(reservationId, status) {
   return apiRequest(`/api/reservations/${reservationId}/update_status/`, { method: "PATCH", body: { status } });
 }
@@ -148,12 +152,36 @@ async function listMenuItems(query) {
   return apiRequest("/api/menu/items/", { query });
 }
 
+async function createMenuItem(payload) {
+  return apiRequest("/api/menu/items/", { method: "POST", body: payload });
+}
+
+async function updateMenuItem(itemId, payload) {
+  return apiRequest(`/api/menu/items/${itemId}/`, { method: "PATCH", body: payload });
+}
+
+async function deleteMenuItem(itemId) {
+  return apiRequest(`/api/menu/items/${itemId}/`, { method: "DELETE" });
+}
+
 async function toggleMenuItemAvailability(itemId) {
   return apiRequest(`/api/menu/items/${itemId}/toggle_availability/`, { method: "PATCH" });
 }
 
 async function listCategories() {
   return apiRequest("/api/menu/categories/");
+}
+
+async function createCategory(payload) {
+  return apiRequest("/api/menu/categories/", { method: "POST", body: payload });
+}
+
+async function updateCategory(categoryId, payload) {
+  return apiRequest(`/api/menu/categories/${categoryId}/`, { method: "PATCH", body: payload });
+}
+
+async function deleteCategory(categoryId) {
+  return apiRequest(`/api/menu/categories/${categoryId}/`, { method: "DELETE" });
 }
 
 async function getDashboardReport() {
@@ -175,9 +203,13 @@ async function getStaffReport(query) {
 export {
   apiRequest,
   changePassword,
+  createCategory,
   createOrder,
   createReservation,
   createUser,
+  createMenuItem,
+  deleteCategory,
+  deleteMenuItem,
   deleteUser,
   getCurrentUser,
   getDashboardReport,
@@ -197,6 +229,9 @@ export {
   logout,
   refreshSession,
   toggleMenuItemAvailability,
+  updateCategory,
+  updateMenuItem,
   updateOrderStatus,
+  updateReservation,
   updateReservationStatus,
 };

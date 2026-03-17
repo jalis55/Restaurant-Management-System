@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsAdminOrManager, IsStaffRole
+from apps.accounts.permissions import CanReadMenu, IsAdminOrManager
 from apps.menu.filters import MenuItemFilter
 from apps.menu.models import Category, MenuItem
 from apps.menu.serializers import CategoryDetailSerializer, CategorySerializer, MenuItemSerializer
@@ -18,7 +18,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in {"list", "retrieve", "items"}:
-            permission_classes = [IsAuthenticated, IsStaffRole]
+            permission_classes = [IsAuthenticated, CanReadMenu]
         else:
             permission_classes = [IsAuthenticated, IsAdminOrManager]
         return [permission() for permission in permission_classes]
@@ -50,7 +50,7 @@ class MenuItemViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in {"list", "retrieve", "featured"}:
-            permission_classes = [IsAuthenticated, IsStaffRole]
+            permission_classes = [IsAuthenticated, CanReadMenu]
         else:
             permission_classes = [IsAuthenticated, IsAdminOrManager]
         return [permission() for permission in permission_classes]
