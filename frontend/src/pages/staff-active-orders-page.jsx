@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
 import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
+import { useAuth } from "@/hooks/use-auth";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useOrderEvents } from "@/hooks/use-order-events";
 import { listActiveOrders, updateOrderStatus } from "@/lib/api";
@@ -18,7 +19,12 @@ function sortOrders(orders) {
   return [...orders].sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
 }
 
+function getWaiterNextStatuses(status) {
+  return getNextOrderStatuses(status).filter((nextStatus) => nextStatus !== "confirmed");
+}
+
 function StaffActiveOrdersPage() {
+  const { user } = useAuth();
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listActiveOrders());
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState("");
@@ -96,7 +102,7 @@ function StaffActiveOrdersPage() {
                     tone={getOrderTone(order.status)}
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {getNextOrderStatuses(order.status).map((nextStatus) => (
+                    {getWaiterNextStatuses(order.status).map((nextStatus) => (
                       <button
                         key={nextStatus}
                         className="rounded-xl border border-black/8 bg-[#f7f7f4] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-950 hover:text-white"
@@ -107,6 +113,9 @@ function StaffActiveOrdersPage() {
                         {busyId === order.id ? "Updating..." : formatOrderStatus(nextStatus)}
                       </button>
                     ))}
+                    {order.status === "pending" && user?.role === "waiter" ? (
+                      <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Awaiting kitchen or manager confirmation</span>
+                    ) : null}
                   </div>
                 </div>
               ))}

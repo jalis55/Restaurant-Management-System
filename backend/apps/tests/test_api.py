@@ -403,6 +403,25 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertEqual(cancel_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("status", cancel_response.data)
 
+    def test_waiter_cannot_confirm_order(self):
+        order = Order.objects.create(
+            table_number=5,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.PENDING,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=1, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(
+            f"/api/orders/{order.id}/update_status/",
+            {"status": OrderStatus.CONFIRMED},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", response.data)
+
 
 class ReservationAPITests(BaseAPITestCase):
     def test_create_today_and_availability_flows(self):
