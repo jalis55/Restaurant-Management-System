@@ -90,7 +90,7 @@ function DashboardSidebar({ mobileOpen, setMobileOpen }) {
 
           <div className="relative flex items-center justify-between">
             <div>
-              <p className="text-[2rem] font-black tracking-tight text-[#c6ff2f]">made.</p>
+              <p className="text-[1rem] font-black tracking-tight text-[#c6ff2f]">KitchenSync v1.0</p>
               <p className="mt-1 text-xs uppercase tracking-[0.28em] text-white/35">
                 {user?.role === "admin" || user?.role === "manager" ? "Admin panel" : "Staff panel"}
               </p>

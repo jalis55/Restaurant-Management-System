@@ -17,12 +17,10 @@ function MobileTopbar({ onOpen }) {
         </button>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace</p>
-          <p className="text-sm font-medium text-slate-700">made. operations</p>
+          <p className="text-sm font-medium text-slate-700">KitchenSync operations</p>
         </div>
       </div>
-      <div className="rounded-full border border-black/8 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
-        Online
-      </div>
+
     </div>
   );
 }
