@@ -6,7 +6,7 @@ django-filter
 python-dotenv
 psycopg2-binary
 channels
-celery
+channels_redis
 redis
 django-cors-headers
 daphne

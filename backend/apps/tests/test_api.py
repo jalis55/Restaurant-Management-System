@@ -138,26 +138,26 @@ class AuthAPITests(BaseAPITestCase):
     def test_manager_can_create_user_and_waiter_cannot(self):
         manager_client = self.auth_client(self.manager)
         create_payload = {
-            "username": "cashier1",
-            "email": "cashier1@example.com",
-            "first_name": "Cash",
-            "last_name": "Ier",
-            "role": "cashier",
+            "username": "kitchen1",
+            "email": "kitchen1@example.com",
+            "first_name": "Kitchen",
+            "last_name": "Crew",
+            "role": "kitchen",
             "phone": "0123456",
             "is_active": True,
-            "password": "CashierPass123!",
+            "password": "KitchenPass123!",
         }
         ok_response = manager_client.post("/api/auth/users/", create_payload, format="json")
         self.assertEqual(ok_response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(User.objects.filter(username="cashier1").exists())
+        self.assertTrue(User.objects.filter(username="kitchen1").exists())
 
         waiter_client = self.auth_client(self.waiter)
         denied_response = waiter_client.post(
             "/api/auth/users/",
             {
                 **create_payload,
-                "username": "cashier2",
-                "email": "cashier2@example.com",
+                "username": "kitchen2",
+                "email": "kitchen2@example.com",
             },
             format="json",
         )

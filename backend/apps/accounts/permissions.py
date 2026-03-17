@@ -26,7 +26,6 @@ ORDER_VIEW_ROLES = {
     UserRole.MANAGER,
     UserRole.WAITER,
     UserRole.KITCHEN,
-    UserRole.CASHIER,
 }
 
 RESERVATION_MANAGE_ROLES = {
@@ -65,7 +64,6 @@ class IsStaffRole(BasePermission):
                 UserRole.MANAGER,
                 UserRole.WAITER,
                 UserRole.KITCHEN,
-                UserRole.CASHIER,
             }
         )
 

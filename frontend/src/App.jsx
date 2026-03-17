@@ -27,7 +27,7 @@ function RoleHomeRoute() {
     return <RoleOverviewPage user={user} />;
   }
 
-  return <Navigate to={user?.role === "waiter" ? "/staff/orders/new" : user?.role === "cashier" ? "/staff/orders/active" : "/staff/orders/kitchen"} replace />;
+  return <Navigate to={user?.role === "waiter" ? "/staff/orders/new" : "/staff/orders/kitchen"} replace />;
 }
 
 function App() {

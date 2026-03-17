@@ -16,7 +16,6 @@ restaurant_backend/
 │   ├── urls.py           # Root URL routing
 │   ├── asgi.py           # Channels/WebSocket entry
 │   ├── wsgi.py
-│   ├── celery.py
 │   └── admin.py          # All model admin registrations
 └── apps/
     ├── accounts/         # Auth, JWT, roles
@@ -68,10 +67,10 @@ python manage.py runserver
 daphne -p 8000 config.asgi:application
 ```
 
-### 6. Start Celery worker (optional, for background tasks)
+### 6. Configure Channels with Redis (optional, recommended for multi-process)
 
 ```bash
-celery -A config.celery worker --loglevel=info
+export CHANNEL_LAYER_URL=redis://127.0.0.1:6379/1
 ```
 
 ---
@@ -84,7 +83,7 @@ celery -A config.celery worker --loglevel=info
 cp .env.example .env
 ```
 
-This Docker setup uses SQLite for now and persists the database file in a Docker volume. Redis is still included for Celery.
+This Docker setup uses SQLite for now and persists the database file in a Docker volume. Redis is included for Django Channels so WebSocket events work across processes.
 
 ### 2. Build and start everything
 
@@ -93,15 +92,13 @@ docker compose up --build
 ```
 
 This starts:
-- `web`  Django + Daphne on `http://localhost:8000`
-- `redis`  Redis for Celery
-- `worker`  Celery worker
-- `beat`  Celery beat scheduler
+- `backend`  Django + Daphne on `http://localhost:8000`
+- `redis`  Redis for Channels
 
 ### 3. Run management commands
 
 ```bash
-docker compose exec web python3 manage.py createsuperuser
+docker compose exec backend python3 manage.py createsuperuser
 ```
 
 ---
@@ -186,7 +183,6 @@ Events pushed to all connected clients:
 | `manager` | Full access except user deletion |
 | `waiter` | Orders, reservations, menu read |
 | `kitchen` | Orders read/status update |
-| `cashier` | Orders read/status update, reservations |
 
 ---
 

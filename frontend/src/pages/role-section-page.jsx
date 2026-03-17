@@ -438,7 +438,7 @@ function StaffPerformancePage() {
         <div className="space-y-3">
           <QueueItem title="Expo handoff" meta="Kitchen-to-floor timing improved on dinner shift" status="Positive" tone="lime" />
           <QueueItem title="Reservation greeting" meta="Front desk consistency dips during peak overlap" status="Coach" tone="amber" />
-          <QueueItem title="Payment closeout" meta="Cashier team has the fastest completion time this week" status="Strong" tone="blue" />
+          <QueueItem title="Service closeout" meta="Waiter handoff stays sharp during the dinner rush" status="Strong" tone="blue" />
         </div>
       </Panel>
     </div>
@@ -456,7 +456,6 @@ function StaffAccountsPage({ user }) {
             ["Owner account", "admin", "Active", "Full permissions"],
             ["Floor manager", "manager", "Active", "Cannot delete users"],
             ["Nadia Rahman", "waiter", "Active", "Reservations + new orders"],
-            ["Samiul Karim", "cashier", "Active", "Active orders + kitchen view"],
             ["Imran A.", "kitchen", "Active", "Kitchen display only"],
           ].map(([name, role, status, scope]) => (
             <div key={name} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/6 p-4">

@@ -226,7 +226,7 @@ function SettingsStaffAccountsPage({ user }) {
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Role</span>
                   <select className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="role" onChange={handleChange} value={form.role}>
-                    {(isManager ? ["manager", "waiter", "cashier", "kitchen"] : ["admin", "manager", "waiter", "cashier", "kitchen"]).map((roleOption) => (
+                    {(isManager ? ["manager", "waiter", "kitchen"] : ["admin", "manager", "waiter", "kitchen"]).map((roleOption) => (
                       <option key={roleOption} value={roleOption}>
                         {roleOption}
                       </option>

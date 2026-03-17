@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 const ADMIN_ROLES = ["admin", "manager"];
-const STAFF_ROLES = ["waiter", "cashier", "kitchen"];
+const STAFF_ROLES = ["waiter", "kitchen"];
 const MENU_READ_ROLES = ["admin", "manager", "waiter", "kitchen"];
 const TABLE_READ_ROLES = ["admin", "manager", "waiter"];
 
@@ -166,7 +166,7 @@ const routeCatalog = [
     label: "Active Orders",
     icon: ListChecks,
     section: "Staff Panel",
-    roles: ["waiter", "cashier"],
+    roles: ["waiter"],
     eyebrow: "Staff Panel",
     title: "Active Orders",
     description: "Follow the live order list, keep an eye on delays, and stay aligned with the kitchen queue.",
@@ -205,10 +205,6 @@ function getUserRole(user) {
 function getDefaultPathForRole(role) {
   if (role === "kitchen") {
     return "/staff/orders/kitchen";
-  }
-
-  if (role === "cashier") {
-    return "/staff/orders/active";
   }
 
   if (role === "waiter") {

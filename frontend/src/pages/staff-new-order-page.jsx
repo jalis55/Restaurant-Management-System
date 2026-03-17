@@ -4,22 +4,42 @@ import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
 import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
-import { createOrder, listMenuItems } from "@/lib/api";
+import { createOrder, listMenuItems, listTables } from "@/lib/api";
 
 const emptyLine = { menu_item: "", notes: "", quantity: 1 };
 
+function formatApiError(errorData) {
+  if (!errorData) {
+    return "Something went wrong.";
+  }
+
+  if (typeof errorData === "string") {
+    return errorData;
+  }
+
+  if (Array.isArray(errorData)) {
+    return errorData.join(" ");
+  }
+
+  return Object.entries(errorData)
+    .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(" ") : value}`)
+    .join(" | ");
+}
+
 function StaffNewOrderPage() {
   const { data: items, error, isLoading } = useAsyncData(() => listMenuItems({ is_available: true }));
+  const { data: tables } = useAsyncData(() => listTables());
   const [form, setForm] = useState({
     notes: "",
     order_type: "dine_in",
-    table_number: "1",
+    table_number: "",
     items: [{ ...emptyLine }],
   });
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const menuItems = items ?? [];
+  const tableOptions = (tables ?? []).filter((table) => table.is_active);
 
   function handleFormChange(event) {
     const { name, value } = event.target;
@@ -43,28 +63,42 @@ function StaffNewOrderPage() {
     setMessage("");
 
     try {
+      const selectedItemsPayload = form.items
+        .filter((item) => item.menu_item)
+        .map((item) => ({
+          menu_item: Number(item.menu_item),
+          notes: item.notes,
+          quantity: Number(item.quantity),
+        }));
+
+      if (!selectedItemsPayload.length) {
+        setMessage("Select at least one menu item before creating the order.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (form.order_type === "dine_in" && !form.table_number) {
+        setMessage("Choose a table for dine-in orders.");
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = {
         notes: form.notes,
         order_type: form.order_type,
         table_number: form.order_type === "dine_in" ? Number(form.table_number) : null,
-        items: form.items
-          .filter((item) => item.menu_item)
-          .map((item) => ({
-            menu_item: Number(item.menu_item),
-            notes: item.notes,
-            quantity: Number(item.quantity),
-          })),
+        items: selectedItemsPayload,
       };
       const order = await createOrder(payload);
       setMessage(`Order ${order.order_number} created successfully.`);
       setForm({
         notes: "",
         order_type: "dine_in",
-        table_number: "1",
+        table_number: "",
         items: [{ ...emptyLine }],
       });
     } catch (submitError) {
-      setMessage(submitError?.data?.detail || JSON.stringify(submitError?.data || {}) || submitError.message);
+      setMessage(submitError?.data?.detail || formatApiError(submitError?.data) || submitError.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -108,15 +142,21 @@ function StaffNewOrderPage() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Table number</span>
-                  <input
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Table</span>
+                  <select
                     className="w-full rounded-2xl border border-black/8 bg-[#f7f7f4] px-4 py-3 text-sm outline-none"
                     disabled={form.order_type !== "dine_in"}
                     name="table_number"
                     onChange={handleFormChange}
-                    type="number"
                     value={form.table_number}
-                  />
+                  >
+                    <option value="">Select table</option>
+                    {tableOptions.map((table) => (
+                      <option key={table.id} value={table.number}>
+                        Table {table.number} · {table.location || "Dining room"} · {table.capacity} seats
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
 

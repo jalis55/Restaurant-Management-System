@@ -1,11 +1,44 @@
 import os
+import socket
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+
+def resolve_host(hostname: str, fallback: str = "127.0.0.1") -> str:
+    """Fall back for Docker-only hostnames when running Django on the host OS."""
+    try:
+        socket.gethostbyname(hostname)
+        return hostname
+    except socket.gaierror:
+        return fallback
+
+
+def resolve_service_url(url: str, fallback_host: str = "127.0.0.1") -> str:
+    """Replace Docker-only hostnames in service URLs when running on the host OS."""
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        return url
+
+    resolved_host = resolve_host(parsed.hostname, fallback=fallback_host)
+    if resolved_host == parsed.hostname:
+        return url
+
+    auth = ""
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth = f"{auth}:{parsed.password}"
+        auth = f"{auth}@"
+
+    port = f":{parsed.port}" if parsed.port else ""
+    netloc = f"{auth}{resolved_host}{port}"
+    return urlunparse(parsed._replace(netloc=netloc))
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
@@ -63,13 +96,14 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 if os.getenv("DB_NAME"):
+    db_host = os.getenv("DB_HOST", "127.0.0.1")
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.getenv("DB_NAME"),
             "USER": os.getenv("DB_USER"),
             "PASSWORD": os.getenv("DB_PASSWORD"),
-            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+            "HOST": resolve_host(db_host),
             "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
@@ -146,14 +180,22 @@ AUTH_COOKIE_REFRESH = os.getenv("AUTH_COOKIE_REFRESH", "refresh_token")
 AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", str(not DEBUG)).lower() == "true"
 AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax")
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+channel_layer_url = os.getenv("CHANNEL_LAYER_URL")
+if channel_layer_url:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [resolve_service_url(channel_layer_url)],
+            },
+        }
     }
-}
-
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 CORS_ALLOW_ALL_ORIGINS = True # For development
 CORS_ALLOW_CREDENTIALS = True

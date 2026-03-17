@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-restaurantdb}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-restaurantdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
@@ -9,66 +28,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
 
-  web:
+  backend:
     build:
       context: .
-    command: ["web"]
+      dockerfile: Dockerfile  # Explicitly specify Dockerfile
+    command: ["backend"]  # Verify this matches your ENTRYPOINT/CMD
+    env_file:
+      - .env
     environment:
-      SECRET_KEY: ${SECRET_KEY:-change-me}
-      DEBUG: ${DEBUG:-True}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
-      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
+      DB_HOST: postgres
+      CHANNEL_LAYER_URL: redis://redis:6379/1
     ports:
       - "8000:8000"
-    volumes:
-      - sqlite_data:/app/data
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - app-network
+    # Add healthcheck for backend if needed
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  worker:
-    build:
-      context: .
-    command: ["worker"]
-    environment:
-      SECRET_KEY: ${SECRET_KEY:-change-me}
-      DEBUG: ${DEBUG:-True}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
-      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
-    volumes:
-      - sqlite_data:/app/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  beat:
-    build:
-      context: .
-    command: ["beat"]
-    environment:
-      SECRET_KEY: ${SECRET_KEY:-change-me}
-      DEBUG: ${DEBUG:-True}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
-      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
-    volumes:
-      - sqlite_data:/app/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
+  postgres_data:
   redis_data:
-  sqlite_data:
