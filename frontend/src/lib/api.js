@@ -148,6 +148,18 @@ async function listTables() {
   return apiRequest("/api/reservations/tables/");
 }
 
+async function createTable(payload) {
+  return apiRequest("/api/reservations/tables/", { method: "POST", body: payload });
+}
+
+async function updateTable(tableId, payload) {
+  return apiRequest(`/api/reservations/tables/${tableId}/`, { method: "PATCH", body: payload });
+}
+
+async function deleteTable(tableId) {
+  return apiRequest(`/api/reservations/tables/${tableId}/`, { method: "DELETE" });
+}
+
 async function listMenuItems(query) {
   return apiRequest("/api/menu/items/", { query });
 }
@@ -206,10 +218,12 @@ export {
   createCategory,
   createOrder,
   createReservation,
+  createTable,
   createUser,
   createMenuItem,
   deleteCategory,
   deleteMenuItem,
+  deleteTable,
   deleteUser,
   getCurrentUser,
   getDashboardReport,
@@ -234,4 +248,5 @@ export {
   updateOrderStatus,
   updateReservation,
   updateReservationStatus,
+  updateTable,
 };

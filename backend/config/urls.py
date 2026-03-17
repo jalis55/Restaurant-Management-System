@@ -16,8 +16,8 @@ api_router = DefaultRouter()
 api_router.register("menu/categories", CategoryViewSet, basename="menu-category")
 api_router.register("menu/items", MenuItemViewSet, basename="menu-item")
 api_router.register("orders", OrderViewSet, basename="order")
-api_router.register("reservations", ReservationViewSet, basename="reservation")
 api_router.register("reservations/tables", TableViewSet, basename="table")
+api_router.register("reservations", ReservationViewSet, basename="reservation")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
