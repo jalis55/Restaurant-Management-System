@@ -1,0 +1,12 @@
+Django
+djangorestframework
+djangorestframework-simplejwt
+drf-spectacular
+django-filter
+python-dotenv
+psycopg2-binary
+channels
+celery
+redis
+django-cors-headers
+daphne

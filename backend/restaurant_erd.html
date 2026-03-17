@@ -1,0 +1,138 @@
+
+<div id="erd" style="padding:8px 0"></div>
+<style>
+#erd svg.erDiagram .divider path { stroke-opacity: 0.5; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+</style>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#2a2a28' : '#f1efea',
+    primaryBorderColor: dark ? '#5f5e5a' : '#b4b2a9',
+    primaryTextColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const diagram = `erDiagram
+  USER {
+    bigint id PK
+    string username
+    string email
+    string first_name
+    string last_name
+    string role
+    string phone
+    bool is_active
+    datetime created_at
+  }
+  CATEGORY {
+    bigint id PK
+    string name
+    text description
+    int display_order
+    bool is_active
+    datetime created_at
+  }
+  MENU_ITEM {
+    bigint id PK
+    bigint category_id FK
+    string name
+    text description
+    decimal price
+    string image
+    bool is_available
+    bool is_featured
+    int preparation_time
+    int calories
+    int display_order
+    datetime created_at
+  }
+  ORDER {
+    bigint id PK
+    string order_number
+    int table_number
+    string order_type
+    string status
+    bigint created_by_id FK
+    text notes
+    decimal total_amount
+    datetime created_at
+    datetime updated_at
+  }
+  ORDER_ITEM {
+    bigint id PK
+    bigint order_id FK
+    bigint menu_item_id FK
+    int quantity
+    decimal unit_price
+    text notes
+  }
+  TABLE {
+    bigint id PK
+    int number
+    int capacity
+    string location
+    bool is_active
+  }
+  RESERVATION {
+    bigint id PK
+    bigint table_id FK
+    string guest_name
+    string guest_phone
+    string guest_email
+    int party_size
+    datetime reserved_at
+    datetime reserved_until
+    string status
+    text special_requests
+    bigint created_by_id FK
+    datetime created_at
+  }
+
+  USER ||--o{ ORDER : "creates"
+  USER ||--o{ RESERVATION : "creates"
+  CATEGORY ||--o{ MENU_ITEM : "contains"
+  ORDER ||--|{ ORDER_ITEM : "has"
+  MENU_ITEM ||--o{ ORDER_ITEM : "included in"
+  TABLE ||--o{ RESERVATION : "booked as"
+`;
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
