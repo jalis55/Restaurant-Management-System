@@ -45,14 +45,14 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def kitchen(self, request):
-        queryset = self.get_queryset().filter(status__in=[OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY])
+        queryset = self.get_queryset().filter(status__in=[OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY])
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["patch"])
     def update_status(self, request, pk=None):
         order = self.get_object()
-        serializer = OrderStatusUpdateSerializer(data=request.data, context={"order": order})
+        serializer = OrderStatusUpdateSerializer(data=request.data, context={"order": order, "request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)

@@ -375,6 +375,34 @@ class OrdersAPITests(BaseAPITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_kitchen_cannot_serve_or_cancel_ready_order(self):
+        order = Order.objects.create(
+            table_number=4,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.READY,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=1, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        kitchen_client = self.auth_client(self.kitchen)
+
+        serve_response = kitchen_client.patch(
+            f"/api/orders/{order.id}/update_status/",
+            {"status": OrderStatus.SERVED},
+            format="json",
+        )
+        self.assertEqual(serve_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", serve_response.data)
+
+        cancel_response = kitchen_client.patch(
+            f"/api/orders/{order.id}/update_status/",
+            {"status": OrderStatus.CANCELLED},
+            format="json",
+        )
+        self.assertEqual(cancel_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", cancel_response.data)
+
 
 class ReservationAPITests(BaseAPITestCase):
     def test_create_today_and_availability_flows(self):

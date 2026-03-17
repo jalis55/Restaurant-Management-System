@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from apps.accounts.models import UserRole
 from apps.menu.models import MenuItem
 from apps.orders.events import broadcast_order_event
 from apps.orders.models import Order, OrderItem, OrderStatus, OrderType
@@ -83,6 +84,15 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=OrderStatus.choices)
+
+    def validate_status(self, value):
+        order = self.context["order"]
+        request = self.context.get("request")
+
+        if getattr(request.user, "role", None) == UserRole.KITCHEN and order.status == OrderStatus.READY:
+            raise serializers.ValidationError("Kitchen cannot serve or cancel an order after it is ready.")
+
+        return value
 
     def save(self, **kwargs):
         order = self.context["order"]
