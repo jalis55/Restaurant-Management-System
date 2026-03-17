@@ -1,17 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
 import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { useOrderEvents } from "@/hooks/use-order-events";
 import { listActiveOrders, updateOrderStatus } from "@/lib/api";
 import { formatOrderStatus, getNextOrderStatuses, getOrderTone } from "@/lib/order-utils";
+
+
+function isActiveOrder(order) {
+  return order.status !== "served" && order.status !== "cancelled";
+}
+
+
+function sortOrders(orders) {
+  return [...orders].sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+}
 
 function StaffActiveOrdersPage() {
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listActiveOrders());
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState("");
   const orderList = orders ?? [];
+
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const latestOrders = await listActiveOrders();
+        setOrders(latestOrders);
+      } catch {
+        // Keep the current list when a background refresh fails.
+      }
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [setOrders]);
+
+  useOrderEvents((event) => {
+    if (!event?.order) {
+      return;
+    }
+
+    setOrders((currentOrders) => {
+      const existingOrders = currentOrders ?? [];
+      const withoutCurrent = existingOrders.filter((order) => order.id !== event.order.id);
+
+      if (!isActiveOrder(event.order)) {
+        return withoutCurrent;
+      }
+
+      return sortOrders([event.order, ...withoutCurrent]);
+    });
+  });
 
   async function handleStatusChange(orderId, status) {
     setBusyId(orderId);

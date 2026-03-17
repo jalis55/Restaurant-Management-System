@@ -1,7 +1,9 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from apps.accounts.models import User
+from apps.accounts.models import User, UserRole
+
+MANAGER_ASSIGNABLE_ROLES = {UserRole.WAITER, UserRole.KITCHEN}
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -44,12 +46,37 @@ class UserCreateSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
+    def validate_role(self, value):
+        request = self.context.get("request")
+        if getattr(request.user, "role", None) == UserRole.MANAGER and value not in MANAGER_ASSIGNABLE_ROLES:
+            raise serializers.ValidationError("Managers can only assign waiter or kitchen roles.")
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop("password")
         user = User(**validated_data)
         user.set_password(password)
         user.save()
         return user
+
+
+class UserUpdateSerializer(UserSerializer):
+    def validate_role(self, value):
+        request = self.context.get("request")
+        actor_role = getattr(request.user, "role", None)
+        instance = getattr(self, "instance", None)
+
+        if actor_role != UserRole.MANAGER:
+            return value
+
+        if instance == request.user:
+            if value != UserRole.MANAGER:
+                raise serializers.ValidationError("Managers cannot change their own role.")
+            return value
+
+        if value not in MANAGER_ASSIGNABLE_ROLES:
+            raise serializers.ValidationError("Managers can only assign waiter or kitchen roles.")
+        return value
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -1,4 +1,4 @@
-import { Plus, ShieldAlert, X } from "lucide-react";
+import { Pencil, Plus, ShieldAlert, X } from "lucide-react";
 import { useState } from "react";
 
 import { DataState } from "@/components/data-state";
@@ -6,7 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { Panel, StatCard } from "@/components/section-page-ui";
 import { Button } from "@/components/ui/button";
 import { useAsyncData } from "@/hooks/use-async-data";
-import { createUser, deleteUser, listUsers } from "@/lib/api";
+import { createUser, deleteUser, listUsers, updateUser } from "@/lib/api";
 
 const defaultForm = {
   username: "",
@@ -48,13 +48,47 @@ function SettingsStaffAccountsPage({ user }) {
   const [modalMessage, setModalMessage] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
 
   const userList = users ?? [];
+  const visibleUserList = isManager
+    ? userList.filter((account) => account.role === "waiter" || account.role === "kitchen")
+    : userList;
 
   function handleChange(event) {
     const { name, type, value, checked } = event.target;
     setForm((currentForm) => ({ ...currentForm, [name]: type === "checkbox" ? checked : value }));
+  }
+
+  function closeModal() {
+    setIsModalOpen(false);
+    setEditingUserId(null);
+    setForm({ ...defaultForm });
+    setModalMessage("");
+  }
+
+  function openCreateModal() {
+    setEditingUserId(null);
+    setForm({ ...defaultForm });
+    setModalMessage("");
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(account) {
+    setEditingUserId(account.id);
+    setForm({
+      username: account.username ?? "",
+      email: account.email ?? "",
+      first_name: account.first_name ?? "",
+      last_name: account.last_name ?? "",
+      phone: account.phone ?? "",
+      role: account.role ?? "waiter",
+      is_active: account.is_active ?? true,
+      password: "",
+    });
+    setModalMessage("");
+    setIsModalOpen(true);
   }
 
   async function handleSubmit(event) {
@@ -63,12 +97,24 @@ function SettingsStaffAccountsPage({ user }) {
     setModalMessage("");
 
     try {
-      const createdUser = await createUser(form);
-      setUsers((currentUsers) => [...(currentUsers ?? []), createdUser].sort((left, right) => left.username.localeCompare(right.username)));
-      setForm({ ...defaultForm });
-      setPageMessage("Staff account created.");
-      setModalMessage("Staff account created.");
-      setIsCreateModalOpen(false);
+      if (editingUserId) {
+        const payload = { ...form };
+        if (!payload.password) {
+          delete payload.password;
+        }
+        const updatedUser = await updateUser(editingUserId, payload);
+        setUsers((currentUsers) =>
+          (currentUsers ?? [])
+            .map((account) => (account.id === editingUserId ? updatedUser : account))
+            .sort((left, right) => left.username.localeCompare(right.username)),
+        );
+        setPageMessage("Staff account updated.");
+      } else {
+        const createdUser = await createUser(form);
+        setUsers((currentUsers) => [...(currentUsers ?? []), createdUser].sort((left, right) => left.username.localeCompare(right.username)));
+        setPageMessage("Staff account created.");
+      }
+      closeModal();
     } catch (submitError) {
       setModalMessage(submitError?.data?.detail || formatApiError(submitError?.data) || submitError.message);
     } finally {
@@ -97,12 +143,12 @@ function SettingsStaffAccountsPage({ user }) {
       title="Staff Accounts"
       description="Create and manage staff access, roles, and account setup for restaurant operations."
       stats={[
-        <StatCard key="accounts" label="Accounts" value={String(userList.length)} note="Total staff" />,
-        <StatCard key="active" label="Active" value={String(userList.filter((account) => account.is_active).length)} note="Current access" />,
+        <StatCard key="accounts" label="Accounts" value={String(visibleUserList.length)} note="Visible staff" />,
+        <StatCard key="active" label="Active" value={String(visibleUserList.filter((account) => account.is_active).length)} note="Current access" />,
         <StatCard key="delete" label="Deletion" value={isManager ? "Restricted" : "Enabled"} note={isManager ? "Manager safe mode" : "Owner only"} />,
       ]}
       actions={
-        <Button className="h-11 rounded-xl bg-slate-950 px-5 text-sm text-white hover:bg-slate-900" onClick={() => setIsCreateModalOpen(true)} type="button">
+        <Button className="h-11 rounded-xl bg-slate-950 px-5 text-sm text-white hover:bg-slate-900" onClick={openCreateModal} type="button">
           <Plus className="size-4" />
           Create user
         </Button>
@@ -113,7 +159,7 @@ function SettingsStaffAccountsPage({ user }) {
         <DataState isLoading={isLoading} error={error} empty={false} loadingLabel="Loading staff accounts...">
           <Panel eyebrow="Access control" title="Staff account workspace">
             <div className="space-y-3">
-              {userList.map((account) => (
+              {visibleUserList.map((account) => (
                 <div key={account.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/6 p-4">
                   <div>
                     <p className="text-base font-semibold text-slate-950">{account.first_name || account.last_name ? `${account.first_name} ${account.last_name}`.trim() : account.username}</p>
@@ -124,6 +170,9 @@ function SettingsStaffAccountsPage({ user }) {
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${account.is_active ? "bg-lime-100 text-lime-900" : "bg-red-100 text-red-900"}`}>
                       {account.is_active ? "Active" : "Inactive"}
                     </span>
+                    <button className="rounded-xl border border-black/8 bg-white p-2 text-slate-600" onClick={() => openEditModal(account)} type="button">
+                      <Pencil className="size-4" />
+                    </button>
                     {!isManager && account.id !== user?.id ? (
                       <button
                         className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-red-700"
@@ -150,7 +199,7 @@ function SettingsStaffAccountsPage({ user }) {
                   Destructive user deletion stays disabled
                 </p>
                 <p className="mt-1 text-sm leading-6 text-amber-900/80">
-                  Managers can create and update staff accounts, but permanent delete actions remain unavailable.
+                  Managers can create and update waiter and kitchen accounts, but they cannot access admin or manager accounts and permanent delete actions remain unavailable.
                 </p>
               </div>
             </Panel>
@@ -167,25 +216,21 @@ function SettingsStaffAccountsPage({ user }) {
         </div>
       </div>
 
-      {isCreateModalOpen ? (
+      {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-[32px] border border-black/8 bg-[#fbfbf8] p-6 shadow-[0_30px_100px_rgba(15,23,42,0.24)] sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-400">Create user</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">New staff account</h2>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-400">{editingUserId ? "Edit user" : "Create user"}</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{editingUserId ? "Update staff account" : "New staff account"}</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Add a new account and assign the correct restaurant role from the backend-supported role list.
+                  {editingUserId ? "Review and update staff details within the roles allowed for your access level." : "Add a new account and assign the correct restaurant role from the backend-supported role list."}
                 </p>
               </div>
 
               <button
                 className="flex h-11 w-11 items-center justify-center rounded-2xl border border-black/8 bg-white text-slate-600 transition hover:bg-slate-50"
-                onClick={() => {
-                  setIsCreateModalOpen(false);
-                  setForm({ ...defaultForm });
-                  setModalMessage("");
-                }}
+                onClick={closeModal}
                 type="button"
               >
                 <X className="size-5" />
@@ -214,7 +259,7 @@ function SettingsStaffAccountsPage({ user }) {
                       className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none"
                       name={name}
                       onChange={handleChange}
-                      required={name !== "phone"}
+                      required={name !== "phone" && (!editingUserId || name !== "password")}
                       type={name === "password" ? "password" : "text"}
                       value={form[name]}
                     />
@@ -226,7 +271,7 @@ function SettingsStaffAccountsPage({ user }) {
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Role</span>
                   <select className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="role" onChange={handleChange} value={form.role}>
-                    {(isManager ? ["manager", "waiter", "kitchen"] : ["admin", "manager", "waiter", "kitchen"]).map((roleOption) => (
+                    {(isManager ? ["waiter", "kitchen"] : ["admin", "manager", "waiter", "kitchen"]).map((roleOption) => (
                       <option key={roleOption} value={roleOption}>
                         {roleOption}
                       </option>
@@ -244,17 +289,13 @@ function SettingsStaffAccountsPage({ user }) {
                 <Button
                   variant="outline"
                   className="h-11 rounded-xl border-black/10 bg-white px-4 text-sm shadow-none"
-                  onClick={() => {
-                    setIsCreateModalOpen(false);
-                    setForm({ ...defaultForm });
-                    setModalMessage("");
-                  }}
+                  onClick={closeModal}
                   type="button"
                 >
                   Cancel
                 </Button>
                 <Button className="h-11 rounded-xl bg-slate-950 px-5 text-sm text-white hover:bg-slate-900" disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Creating..." : "Create account"}
+                  {isSubmitting ? (editingUserId ? "Saving..." : "Creating...") : editingUserId ? "Save changes" : "Create account"}
                 </Button>
               </div>
             </form>

@@ -1,17 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
 import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { useOrderEvents } from "@/hooks/use-order-events";
 import { listKitchenOrders, updateOrderStatus } from "@/lib/api";
 import { formatOrderStatus, getNextOrderStatuses, getOrderTone } from "@/lib/order-utils";
+
+
+function isKitchenOrder(order) {
+  return ["confirmed", "preparing", "ready"].includes(order.status);
+}
+
+
+function sortOrders(orders) {
+  return [...orders].sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+}
 
 function StaffKitchenDisplayPage() {
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listKitchenOrders());
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState("");
   const orderList = orders ?? [];
+
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const latestOrders = await listKitchenOrders();
+        setOrders(latestOrders);
+      } catch {
+        // Keep the current list when a background refresh fails.
+      }
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [setOrders]);
+
+  useOrderEvents((event) => {
+    if (!event?.order) {
+      return;
+    }
+
+    setOrders((currentOrders) => {
+      const existingOrders = currentOrders ?? [];
+      const withoutCurrent = existingOrders.filter((order) => order.id !== event.order.id);
+
+      if (!isKitchenOrder(event.order)) {
+        return withoutCurrent;
+      }
+
+      return sortOrders([event.order, ...withoutCurrent]);
+    });
+  });
 
   async function handleStatusChange(orderId, status) {
     setBusyId(orderId);

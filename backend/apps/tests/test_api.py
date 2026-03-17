@@ -163,6 +163,137 @@ class AuthAPITests(BaseAPITestCase):
         )
         self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_manager_cannot_create_admin_or_manager_accounts(self):
+        manager_client = self.auth_client(self.manager)
+
+        admin_response = manager_client.post(
+            "/api/auth/users/",
+            {
+                "username": "admin2",
+                "email": "admin2@example.com",
+                "first_name": "Admin",
+                "last_name": "Two",
+                "role": "admin",
+                "phone": "0123456",
+                "is_active": True,
+                "password": "AdminPass456!",
+            },
+            format="json",
+        )
+        self.assertEqual(admin_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", admin_response.data)
+
+        manager_response = manager_client.post(
+            "/api/auth/users/",
+            {
+                "username": "manager2",
+                "email": "manager2@example.com",
+                "first_name": "Manager",
+                "last_name": "Two",
+                "role": "manager",
+                "phone": "0123456",
+                "is_active": True,
+                "password": "ManagerPass456!",
+            },
+            format="json",
+        )
+        self.assertEqual(manager_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", manager_response.data)
+
+    def test_manager_only_sees_self_waiters_and_kitchen_users(self):
+        extra_manager = User.objects.create_user(
+            username="manager2",
+            email="manager2@example.com",
+            password="ManagerPass123!",
+            first_name="Second",
+            last_name="Manager",
+            role="manager",
+        )
+        admin_two = User.objects.create_user(
+            username="admin2",
+            email="admin2@example.com",
+            password="AdminPass123!",
+            first_name="Second",
+            last_name="Admin",
+            role="admin",
+            is_superuser=True,
+        )
+        extra_waiter = User.objects.create_user(
+            username="waiter2",
+            email="waiter2@example.com",
+            password="WaiterPass123!",
+            first_name="Second",
+            last_name="Waiter",
+            role="waiter",
+        )
+
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.get("/api/auth/users/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = {row["username"] for row in response.data}
+        self.assertIn("manager", usernames)
+        self.assertIn("waiter", usernames)
+        self.assertIn(extra_waiter.username, usernames)
+        self.assertIn("kitchen", usernames)
+        self.assertNotIn(extra_manager.username, usernames)
+        self.assertNotIn(admin_two.username, usernames)
+
+    def test_manager_cannot_retrieve_or_update_other_managers_and_admins(self):
+        extra_manager = User.objects.create_user(
+            username="manager2",
+            email="manager2@example.com",
+            password="ManagerPass123!",
+            first_name="Second",
+            last_name="Manager",
+            role="manager",
+        )
+        admin_two = User.objects.create_user(
+            username="admin2",
+            email="admin2@example.com",
+            password="AdminPass123!",
+            first_name="Second",
+            last_name="Admin",
+            role="admin",
+            is_superuser=True,
+        )
+
+        manager_client = self.auth_client(self.manager)
+
+        retrieve_manager = manager_client.get(f"/api/auth/users/{extra_manager.id}/")
+        self.assertEqual(retrieve_manager.status_code, status.HTTP_404_NOT_FOUND)
+
+        retrieve_admin = manager_client.get(f"/api/auth/users/{admin_two.id}/")
+        self.assertEqual(retrieve_admin.status_code, status.HTTP_404_NOT_FOUND)
+
+        update_manager = manager_client.patch(
+            f"/api/auth/users/{extra_manager.id}/",
+            {"first_name": "Blocked"},
+            format="json",
+        )
+        self.assertEqual(update_manager.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_manager_can_update_waiter_but_cannot_promote_them(self):
+        manager_client = self.auth_client(self.manager)
+
+        update_response = manager_client.patch(
+            f"/api/auth/users/{self.waiter.id}/",
+            {"first_name": "Updated", "role": "kitchen"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.waiter.refresh_from_db()
+        self.assertEqual(self.waiter.first_name, "Updated")
+        self.assertEqual(self.waiter.role, "kitchen")
+
+        promote_response = manager_client.patch(
+            f"/api/auth/users/{self.waiter.id}/",
+            {"role": "manager"},
+            format="json",
+        )
+        self.assertEqual(promote_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", promote_response.data)
+
 
 class MenuAPITests(BaseAPITestCase):
     def test_staff_can_list_category_items_and_featured_menu_items(self):

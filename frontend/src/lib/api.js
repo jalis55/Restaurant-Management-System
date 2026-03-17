@@ -96,6 +96,10 @@ async function createUser(payload) {
   return apiRequest("/api/auth/users/", { method: "POST", body: payload });
 }
 
+async function updateUser(userId, payload) {
+  return apiRequest(`/api/auth/users/${userId}/`, { method: "PATCH", body: payload });
+}
+
 async function deleteUser(userId) {
   return apiRequest(`/api/auth/users/${userId}/`, { method: "DELETE" });
 }
@@ -249,4 +253,5 @@ export {
   updateReservation,
   updateReservationStatus,
   updateTable,
+  updateUser,
 };

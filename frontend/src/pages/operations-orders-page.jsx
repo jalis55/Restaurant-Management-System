@@ -1,16 +1,21 @@
 import { CheckCheck, Clock3, ReceiptText } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
 import { MiniMetric, Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { useOrderEvents } from "@/hooks/use-order-events";
 import { listOrders, updateOrderStatus } from "@/lib/api";
 import { formatOrderStatus, getNextOrderStatuses, getOrderTone } from "@/lib/order-utils";
 
 function formatOrderMeta(order) {
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
   return `${order.order_type.replace("_", " ")} · ${itemCount} items · ${order.created_by_name || "Staff"} · ${order.total_amount}`;
+}
+
+function sortOrders(orders) {
+  return [...orders].sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
 }
 
 function OperationsOrdersPage() {
@@ -22,6 +27,33 @@ function OperationsOrdersPage() {
   const openOrders = orderList.filter((order) => !["served", "cancelled"].includes(order.status));
   const readyOrders = orderList.filter((order) => order.status === "ready");
   const atRiskOrders = orderList.filter((order) => ["pending", "confirmed"].includes(order.status));
+
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const latestOrders = await listOrders();
+        setOrders(latestOrders);
+      } catch {
+        // Keep the current list when a background refresh fails.
+      }
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [setOrders]);
+
+  useOrderEvents((event) => {
+    if (!event?.order) {
+      return;
+    }
+
+    setOrders((currentOrders) => {
+      const existingOrders = currentOrders ?? [];
+      const withoutCurrent = existingOrders.filter((order) => order.id !== event.order.id);
+      return sortOrders([event.order, ...withoutCurrent]);
+    });
+  });
 
   async function handleStatusChange(orderId, status) {
     setBusyId(orderId);
