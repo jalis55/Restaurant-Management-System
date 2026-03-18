@@ -11,7 +11,8 @@ import { formatOrderStatus, getNextOrderStatuses, getOrderTone } from "@/lib/ord
 
 function formatOrderMeta(order) {
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  return `${order.order_type.replace("_", " ")} · ${itemCount} items · ${order.created_by_name || "Staff"} · ${order.total_amount}`;
+  const billedLabel = order.billed_at ? ` · billed ${Number(order.final_amount).toFixed(2)}` : "";
+  return `${order.order_type.replace("_", " ")} · ${itemCount} items · ${order.created_by_name || "Staff"} · ${order.total_amount}${billedLabel}`;
 }
 
 function sortOrders(orders) {

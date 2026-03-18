@@ -24,6 +24,27 @@ async function parseResponse(response) {
   return isJson ? response.json() : null;
 }
 
+function formatApiError(data) {
+  if (!data) {
+    return "Request failed.";
+  }
+
+  if (typeof data.detail === "string" && data.detail) {
+    return data.detail;
+  }
+
+  const fieldMessages = Object.entries(data)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .flatMap(([field, value]) => {
+      const messages = Array.isArray(value) ? value : [value];
+      return messages
+        .filter(Boolean)
+        .map((message) => `${field === "non_field_errors" ? "Error" : field}: ${String(message)}`);
+    });
+
+  return fieldMessages[0] ?? "Request failed.";
+}
+
 async function rawRequest(path, options = {}) {
   const { query, headers, body, ...rest } = options;
 
@@ -50,7 +71,7 @@ async function apiRequest(path, options = {}, config = {}) {
       const retriedData = await parseResponse(retried);
 
       if (!retried.ok) {
-        const error = new Error(retriedData?.detail || "Request failed.");
+        const error = new Error(formatApiError(retriedData));
         error.status = retried.status;
         error.data = retriedData;
         throw error;
@@ -63,7 +84,7 @@ async function apiRequest(path, options = {}, config = {}) {
   const data = await parseResponse(response);
 
   if (!response.ok) {
-    const error = new Error(data?.detail || "Request failed.");
+    const error = new Error(formatApiError(data));
     error.status = response.status;
     error.data = data;
     throw error;
@@ -126,6 +147,10 @@ async function createOrder(payload) {
 
 async function updateOrderStatus(orderId, status) {
   return apiRequest(`/api/orders/${orderId}/update_status/`, { method: "PATCH", body: { status } });
+}
+
+async function billOrder(orderId, payload) {
+  return apiRequest(`/api/orders/${orderId}/bill/`, { method: "PATCH", body: payload });
 }
 
 async function listReservations(query) {
@@ -218,6 +243,7 @@ async function getStaffReport(query) {
 
 export {
   apiRequest,
+  billOrder,
   changePassword,
   createCategory,
   createOrder,

@@ -3,6 +3,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
@@ -422,6 +423,53 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("status", response.data)
 
+    @patch("apps.orders.serializers.broadcast_order_event")
+    def test_manager_can_bill_served_order_with_percentage_discount(self, broadcast_event):
+        order = Order.objects.create(
+            table_number=8,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.SERVED,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=2, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.patch(
+            f"/api/orders/{order.id}/bill/",
+            {"discount_type": "percentage", "discount_value": "10.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.discount_type, "percentage")
+        self.assertEqual(order.discount_amount, Decimal("2.00"))
+        self.assertEqual(order.final_amount, Decimal("17.98"))
+        self.assertEqual(order.billed_by, self.manager)
+        self.assertIsNotNone(order.billed_at)
+        broadcast_event.assert_called_with("order.billed", response.data)
+
+    def test_manager_cannot_bill_order_before_it_is_served(self):
+        order = Order.objects.create(
+            table_number=9,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.READY,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=1, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.patch(
+            f"/api/orders/{order.id}/bill/",
+            {"discount_type": "amount", "discount_value": "1.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+
 
 class ReservationAPITests(BaseAPITestCase):
     def test_create_today_and_availability_flows(self):
@@ -556,3 +604,17 @@ class ReportsAPITests(BaseAPITestCase):
         client = self.auth_client(self.waiter)
         response = client.get("/api/reports/dashboard/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class MenuSeedCommandTests(TestCase):
+    def test_seed_menu_command_is_idempotent(self):
+        call_command("seed_menu")
+        self.assertEqual(Category.objects.count(), 5)
+        self.assertEqual(MenuItem.objects.count(), 15)
+
+        featured_items = MenuItem.objects.filter(is_featured=True).count()
+        self.assertGreater(featured_items, 0)
+
+        call_command("seed_menu")
+        self.assertEqual(Category.objects.count(), 5)
+        self.assertEqual(MenuItem.objects.count(), 15)

@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import CanCreateOrder, CanDeleteOrder, CanUpdateOrderStatus, CanViewOrders, IsAdminOrManager
 from apps.orders.models import Order, OrderStatus
-from apps.orders.serializers import OrderSerializer, OrderStatusUpdateSerializer
+from apps.orders.serializers import OrderBillingSerializer, OrderSerializer, OrderStatusUpdateSerializer
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -22,6 +22,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated, CanCreateOrder]
         elif self.action == "update_status":
             permission_classes = [IsAuthenticated, CanUpdateOrderStatus]
+        elif self.action == "bill":
+            permission_classes = [IsAuthenticated, IsAdminOrManager]
         elif self.action == "destroy":
             permission_classes = [IsAuthenticated, CanDeleteOrder]
         else:
@@ -53,6 +55,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         order = self.get_object()
         serializer = OrderStatusUpdateSerializer(data=request.data, context={"order": order, "request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["patch"])
+    def bill(self, request, pk=None):
+        order = self.get_object()
+        serializer = OrderBillingSerializer(data=request.data, context={"order": order, "request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)

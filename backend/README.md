@@ -55,6 +55,7 @@ cp .env.example .env
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
+python manage.py seed_menu
 ```
 
 ### 5. Start the development server
@@ -99,6 +100,13 @@ This starts:
 
 ```bash
 docker compose exec backend python3 manage.py createsuperuser
+docker compose exec backend python3 manage.py seed_menu
+```
+
+For local development outside Docker, you can also load demo categories and items with:
+
+```bash
+python manage.py seed_menu
 ```
 
 ---

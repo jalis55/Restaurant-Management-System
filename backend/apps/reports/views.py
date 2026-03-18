@@ -40,7 +40,7 @@ class DashboardReportView(ReportsBaseView):
     def get(self, request):
         start_date = self.get_start_date()
         data = {
-            "revenue": Order.objects.filter(created_at__gte=start_date, status=OrderStatus.SERVED).aggregate(total=Sum("total_amount"))["total"] or 0,
+            "revenue": Order.objects.filter(created_at__gte=start_date, status=OrderStatus.SERVED).aggregate(total=Sum("final_amount"))["total"] or 0,
             "orders": Order.objects.filter(created_at__gte=start_date).count(),
             "active_orders": Order.objects.exclude(status__in=[OrderStatus.SERVED, OrderStatus.CANCELLED]).count(),
             "reservations_today": Reservation.objects.filter(reserved_at__date=timezone.localdate()).count(),
@@ -56,7 +56,7 @@ class RevenueReportView(ReportsBaseView):
             Order.objects.filter(created_at__gte=start_date, status=OrderStatus.SERVED)
             .annotate(day=TruncDate("created_at"))
             .values("day")
-            .annotate(revenue=Sum("total_amount"), orders=Count("id"))
+            .annotate(revenue=Sum("final_amount"), orders=Count("id"))
             .order_by("day")
         )
         return Response(data)
@@ -124,7 +124,7 @@ class StaffReportView(ReportsBaseView):
         order_stats = list(
             Order.objects.filter(created_at__gte=start_date)
             .values("created_by__id", "created_by__username", "created_by__first_name", "created_by__last_name")
-            .annotate(order_count=Count("id"), revenue=Sum("total_amount"))
+            .annotate(order_count=Count("id"), revenue=Sum("final_amount"))
             .order_by("-order_count", "-revenue")
         )
         reservation_stats = list(
