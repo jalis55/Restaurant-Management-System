@@ -1,10 +1,17 @@
+from io import BytesIO
+
 from datetime import timedelta
 
+from django.http import HttpResponse
 from django.db.models import Count, Sum
 from django.db.models import DecimalField, F
 from django.db.models.functions import TruncDate
 from drf_spectacular.utils import extend_schema
 from django.utils import timezone
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +19,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsAdminOrManager
 from apps.orders.models import Order, OrderItem, OrderStatus
 from apps.reports.serializers import (
+    BillReportEntrySerializer,
     DashboardReportSerializer,
     OrdersReportSerializer,
     ReservationsReportSerializer,
@@ -20,6 +28,7 @@ from apps.reports.serializers import (
     TopItemEntrySerializer,
 )
 from apps.reservations.models import Reservation, ReservationStatus
+from .bill_pdf_builder import build_bill_pdf
 
 
 class ReportsBaseView(APIView):
@@ -33,6 +42,14 @@ class ReportsBaseView(APIView):
 
     def get_start_date(self):
         return timezone.now() - timedelta(days=self.get_days())
+
+    def get_billed_orders(self):
+        return (
+            Order.objects.filter(status=OrderStatus.SERVED, billed_at__isnull=False)
+            .select_related("created_by", "billed_by")
+            .prefetch_related("items__menu_item")
+            .order_by("-billed_at", "-created_at")
+        )
 
 
 class DashboardReportView(ReportsBaseView):
@@ -60,6 +77,37 @@ class RevenueReportView(ReportsBaseView):
             .order_by("day")
         )
         return Response(data)
+
+
+class BillsReportView(ReportsBaseView):
+    @extend_schema(tags=["reports"], responses=BillReportEntrySerializer(many=True))
+    def get(self, request):
+        start_date = self.get_start_date()
+        orders = self.get_billed_orders().filter(billed_at__gte=start_date)
+
+        data = [
+            {
+                "id": order.id,
+                "order_number": order.order_number,
+                "table_number": order.table_number,
+                "order_type": order.order_type,
+                "status": order.status,
+                "created_by_name": order.created_by.get_full_name() or order.created_by.username,
+                "billed_by_name": (order.billed_by.get_full_name() or order.billed_by.username) if order.billed_by else "",
+                "billed_at": order.billed_at,
+                "total_amount": order.total_amount,
+                "discount_type": order.discount_type,
+                "discount_value": order.discount_value,
+                "discount_amount": order.discount_amount,
+                "final_amount": order.final_amount,
+                "item_count": sum(item.quantity for item in order.items.all()),
+            }
+            for order in orders
+        ]
+        return Response(data)
+
+
+
 
 
 class TopItemsReportView(ReportsBaseView):
@@ -136,3 +184,18 @@ class StaffReportView(ReportsBaseView):
         for row in order_stats:
             row["reservation_count"] = reservation_map.get(row["created_by__id"], 0)
         return Response(order_stats)
+
+
+# ================== pdf bill download view ==================
+class BillPdfDownloadView(ReportsBaseView):
+    @extend_schema(tags=["reports"], responses={200: {"type": "string", "format": "binary"}})
+    def get(self, request, order_id):
+        order = self.get_billed_orders().filter(pk=order_id).first()
+        if not order:
+            return Response({"detail": "Billed order not found."}, status=404)
+ 
+        buffer = build_bill_pdf(order)
+        response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="bill-{order.order_number}.pdf"'
+        return response
+ 

@@ -233,6 +233,14 @@ async function getRevenueReport(query) {
   return apiRequest("/api/reports/revenue/", { query });
 }
 
+async function getBillsReport(query) {
+  return apiRequest("/api/reports/bills/", { query });
+}
+
+function getBillPdfUrl(orderId) {
+  return buildUrl(`/api/reports/bills/${orderId}/pdf/`);
+}
+
 async function getTopItemsReport(query) {
   return apiRequest("/api/reports/top-items/", { query });
 }
@@ -256,6 +264,8 @@ export {
   deleteTable,
   deleteUser,
   getCurrentUser,
+  getBillPdfUrl,
+  getBillsReport,
   getDashboardReport,
   getRevenueReport,
   getStaffReport,

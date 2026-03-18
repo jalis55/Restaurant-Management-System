@@ -553,14 +553,15 @@ class ReservationAPITests(BaseAPITestCase):
 class ReportsAPITests(BaseAPITestCase):
     def setUp(self):
         super().setUp()
-        served_order = Order.objects.create(
+        self.served_order = Order.objects.create(
             table_number=5,
             order_type=OrderType.DINE_IN,
             created_by=self.manager,
             status=OrderStatus.SERVED,
         )
-        served_order.items.create(menu_item=self.menu_item, quantity=3, unit_price=self.menu_item.price)
-        served_order.recalculate_total()
+        self.served_order.items.create(menu_item=self.menu_item, quantity=3, unit_price=self.menu_item.price)
+        self.served_order.recalculate_total()
+        self.served_order.apply_billing(discount_type="amount", discount_value=Decimal("4.97"), billed_by=self.manager)
         Reservation.objects.create(
             table=self.table,
             guest_name="Report Guest",
@@ -578,11 +579,12 @@ class ReportsAPITests(BaseAPITestCase):
 
         dashboard_response = client.get("/api/reports/dashboard/")
         self.assertEqual(dashboard_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Decimal(str(dashboard_response.data["revenue"])), Decimal("29.97"))
+        self.assertEqual(Decimal(str(dashboard_response.data["revenue"])), Decimal("25.00"))
 
         revenue_response = client.get("/api/reports/revenue/?days=30")
         self.assertEqual(revenue_response.status_code, status.HTTP_200_OK)
         self.assertTrue(len(revenue_response.data) >= 1)
+        self.assertEqual(Decimal(str(revenue_response.data[0]["revenue"])), Decimal("25.00"))
 
         top_items_response = client.get("/api/reports/top-items/?days=30&limit=5")
         self.assertEqual(top_items_response.status_code, status.HTTP_200_OK)
@@ -599,6 +601,16 @@ class ReportsAPITests(BaseAPITestCase):
         staff_response = client.get("/api/reports/staff/")
         self.assertEqual(staff_response.status_code, status.HTTP_200_OK)
         self.assertEqual(staff_response.data[0]["created_by__username"], "manager")
+        self.assertEqual(Decimal(str(staff_response.data[0]["revenue"])), Decimal("25.00"))
+
+        bills_response = client.get("/api/reports/bills/")
+        self.assertEqual(bills_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(bills_response.data[0]["order_number"], self.served_order.order_number)
+        self.assertEqual(Decimal(str(bills_response.data[0]["final_amount"])), Decimal("25.00"))
+
+        pdf_response = client.get(f"/api/reports/bills/{self.served_order.id}/pdf/")
+        self.assertEqual(pdf_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(pdf_response["Content-Type"], "application/pdf")
 
     def test_waiter_cannot_access_reports(self):
         client = self.auth_client(self.waiter)

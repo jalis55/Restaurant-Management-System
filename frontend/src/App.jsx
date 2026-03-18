@@ -6,6 +6,7 @@ import { LoginPage } from "@/pages/login-page";
 import { MenuCategoriesPage } from "@/pages/menu-categories-page";
 import { OperationsBillingPage } from "@/pages/operations-billing-page";
 import { MenuItemsPage } from "@/pages/menu-items-page";
+import { ReportsBillsPage } from "@/pages/reports-bills-page";
 import { OperationsOrdersPage } from "@/pages/operations-orders-page";
 import { OperationsReservationsPage } from "@/pages/operations-reservations-page";
 import { OperationsTablesPage } from "@/pages/operations-tables-page";
@@ -55,6 +56,7 @@ function App() {
           <Route path="menu/items" element={<MenuItemsPage />} />
           <Route path="menu/categories" element={<MenuCategoriesPage />} />
           <Route path="reports/revenue" element={<ReportsRevenuePage />} />
+          <Route path="reports/bills" element={<ReportsBillsPage />} />
           <Route path="reports/top-items" element={<ReportsTopItemsPage />} />
           <Route path="reports/staff-performance" element={<ReportsStaffPerformancePage />} />
           <Route path="settings/staff-accounts" element={<SettingsStaffAccountsPage user={user} />} />

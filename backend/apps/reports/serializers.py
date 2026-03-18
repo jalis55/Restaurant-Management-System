@@ -14,6 +14,23 @@ class RevenueEntrySerializer(serializers.Serializer):
     orders = serializers.IntegerField()
 
 
+class BillReportEntrySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    order_number = serializers.CharField()
+    table_number = serializers.IntegerField(allow_null=True)
+    order_type = serializers.CharField()
+    status = serializers.CharField()
+    created_by_name = serializers.CharField()
+    billed_by_name = serializers.CharField(allow_blank=True)
+    billed_at = serializers.DateTimeField()
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    discount_type = serializers.CharField()
+    discount_value = serializers.DecimalField(max_digits=12, decimal_places=2)
+    discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    final_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    item_count = serializers.IntegerField()
+
+
 class TopItemEntrySerializer(serializers.Serializer):
     menu_item__id = serializers.IntegerField()
     menu_item__name = serializers.CharField()

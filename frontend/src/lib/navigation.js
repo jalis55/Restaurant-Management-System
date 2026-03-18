@@ -119,6 +119,17 @@ const routeCatalog = [
     highlights: ["Daily totals", "Trend lines", "Shift performance"],
   },
   {
+    path: "/reports/bills",
+    label: "Bills",
+    icon: ReceiptText,
+    section: "Reports",
+    roles: ADMIN_ROLES,
+    eyebrow: "Reports",
+    title: "Bills Report",
+    description: "Review finalized bills, inspect discount decisions, and download detailed PDF bills for records or sharing.",
+    highlights: ["Billed orders", "Discount log", "PDF download"],
+  },
+  {
     path: "/reports/top-items",
     label: "Top Items",
     icon: BarChart3,
