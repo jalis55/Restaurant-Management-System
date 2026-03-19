@@ -26,6 +26,10 @@ function getKitchenNextStatuses(status) {
   return getNextOrderStatuses(status);
 }
 
+function getKitchenItems(order) {
+  return order.items.filter((item) => item.service_station === "kitchen");
+}
+
 function StaffKitchenDisplayPage() {
   const { user } = useAuth();
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listKitchenOrders());
@@ -100,10 +104,26 @@ function StaffKitchenDisplayPage() {
               <div key={order.id} className="rounded-2xl border border-black/6 p-4">
                 <QueueItem
                   title={`${order.order_number}${order.table_number ? ` · Table ${order.table_number}` : ""}`}
-                  meta={order.items.filter((item) => item.service_station === "kitchen").map((item) => `${item.menu_item_name} x${item.quantity}`).join(", ")}
+                  meta={getKitchenItems(order).map((item) => `${item.menu_item_name} x${item.quantity}`).join(", ")}
                   status={formatOrderStatus(order.status)}
                   tone={getOrderTone(order.status)}
                 />
+                {order.notes ? (
+                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Order notes</p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-amber-950">{order.notes}</p>
+                  </div>
+                ) : null}
+                <div className="mt-3 space-y-2">
+                  {getKitchenItems(order)
+                    .filter((item) => item.notes)
+                    .map((item) => (
+                      <div key={item.id} className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-800">{item.menu_item_name} notes</p>
+                        <p className="mt-2 text-sm leading-6 text-cyan-950">{item.notes}</p>
+                      </div>
+                    ))}
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {getKitchenNextStatuses(order.status).map((nextStatus) => (
                     <button

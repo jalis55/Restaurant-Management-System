@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { DataState } from "@/components/data-state";
+import { OrderAdditionsModal } from "@/components/order-additions-modal";
 import { PageShell } from "@/components/page-shell";
 import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,6 +43,7 @@ function StaffActiveOrdersPage() {
   const { user } = useAuth();
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listActiveOrders());
   const [busyId, setBusyId] = useState(null);
+  const [editingOrder, setEditingOrder] = useState(null);
   const [message, setMessage] = useState("");
   const orderList = orders ?? [];
 
@@ -113,6 +115,15 @@ function StaffActiveOrdersPage() {
     }
   }
 
+  function handleAdditionalOrderSaved(updatedOrder) {
+    setOrders((currentOrders) => {
+      const nextOrders = (currentOrders ?? []).map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
+      return sortOrders(nextOrders.filter(isActiveOrder));
+    });
+    setEditingOrder(null);
+    setMessage(`Added more items to ${updatedOrder.order_number}.`);
+  }
+
   return (
     <PageShell
       eyebrow="Staff Panel"
@@ -160,6 +171,15 @@ function StaffActiveOrdersPage() {
                         {busyId === order.id ? "Updating..." : "Serve counter items"}
                       </button>
                     ) : null}
+                    {["confirmed", "preparing", "ready"].includes(order.status) ? (
+                      <button
+                        className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-900 transition hover:border-indigo-300 hover:bg-indigo-100"
+                        onClick={() => setEditingOrder(order)}
+                        type="button"
+                      >
+                        Add more
+                      </button>
+                    ) : null}
                     {getWaiterNextStatuses(order.status).map((nextStatus) => (
                       <button
                         key={nextStatus}
@@ -181,6 +201,7 @@ function StaffActiveOrdersPage() {
           </Panel>
         </div>
       </DataState>
+      <OrderAdditionsModal open={Boolean(editingOrder)} order={editingOrder} onClose={() => setEditingOrder(null)} onSaved={handleAdditionalOrderSaved} />
     </PageShell>
   );
 }

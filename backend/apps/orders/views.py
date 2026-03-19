@@ -7,7 +7,7 @@ from apps.accounts.models import UserRole
 from apps.accounts.permissions import CanCreateOrder, CanDeleteOrder, CanUpdateOrderStatus, CanViewOrders, IsAdminOrManager
 from apps.menu.models import MenuServiceStation
 from apps.orders.models import Order, OrderStatus
-from apps.orders.serializers import CounterItemServeSerializer, OrderBillingSerializer, OrderSerializer, OrderStatusUpdateSerializer
+from apps.orders.serializers import CounterItemServeSerializer, OrderAddItemsSerializer, OrderBillingSerializer, OrderSerializer, OrderStatusUpdateSerializer
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -23,6 +23,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated, CanCreateOrder]
         elif self.action in {"update_status", "serve_counter_items"}:
             permission_classes = [IsAuthenticated, CanUpdateOrderStatus]
+        elif self.action == "add_items":
+            permission_classes = [IsAuthenticated, CanCreateOrder]
         elif self.action == "bill":
             permission_classes = [IsAuthenticated, IsAdminOrManager]
         elif self.action == "destroy":
@@ -64,6 +66,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     def serve_counter_items(self, request, pk=None):
         order = self.get_object()
         serializer = CounterItemServeSerializer(data=request.data, context={"order": order, "request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["patch"])
+    def add_items(self, request, pk=None):
+        order = self.get_object()
+        serializer = OrderAddItemsSerializer(data=request.data, context={"order": order, "request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)

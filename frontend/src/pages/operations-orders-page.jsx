@@ -2,6 +2,7 @@ import { CheckCheck, Clock3, ReceiptText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { DataState } from "@/components/data-state";
+import { OrderAdditionsModal } from "@/components/order-additions-modal";
 import { PageShell } from "@/components/page-shell";
 import { MiniMetric, Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
@@ -21,6 +22,7 @@ function sortOrders(orders) {
 
 function OperationsOrdersPage() {
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listOrders());
+  const [editingOrder, setEditingOrder] = useState(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState(null);
 
@@ -71,6 +73,12 @@ function OperationsOrdersPage() {
     }
   }
 
+  function handleAdditionalOrderSaved(updatedOrder) {
+    setOrders((currentOrders) => sortOrders((currentOrders ?? []).map((order) => (order.id === updatedOrder.id ? updatedOrder : order))));
+    setEditingOrder(null);
+    setMessage(`Added more items to ${updatedOrder.order_number}.`);
+  }
+
   return (
     <PageShell
       eyebrow="Operations"
@@ -102,6 +110,15 @@ function OperationsOrdersPage() {
                     tone={getOrderTone(order.status)}
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {["confirmed", "preparing", "ready"].includes(order.status) ? (
+                      <button
+                        className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-900 transition hover:border-indigo-300 hover:bg-indigo-100"
+                        onClick={() => setEditingOrder(order)}
+                        type="button"
+                      >
+                        Add more
+                      </button>
+                    ) : null}
                     {getNextOrderStatuses(order.status).map((nextStatus) => (
                       <button
                         key={nextStatus}
@@ -136,6 +153,7 @@ function OperationsOrdersPage() {
           </div>
         </div>
       </DataState>
+      <OrderAdditionsModal open={Boolean(editingOrder)} order={editingOrder} onClose={() => setEditingOrder(null)} onSaved={handleAdditionalOrderSaved} />
     </PageShell>
   );
 }

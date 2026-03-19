@@ -529,6 +529,105 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertIn("status", response.data)
 
     @patch("apps.orders.serializers.broadcast_order_event")
+    def test_waiter_can_add_more_items_to_confirmed_order(self, broadcast_event):
+        order = Order.objects.create(
+            table_number=14,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.CONFIRMED,
+            notes="Less spicy",
+        )
+        order.items.create(
+            menu_item=self.menu_item,
+            quantity=1,
+            unit_price=self.menu_item.price,
+            service_station=MenuServiceStation.KITCHEN,
+            offer_percentage=self.menu_item.offer_percentage,
+        )
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(
+            f"/api/orders/{order.id}/add_items/",
+            {
+                "items": [
+                    {"menu_item": self.counter_item.id, "quantity": 2, "notes": "Serve now"},
+                ],
+                "note": "Customer added drinks.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.items.count(), 2)
+        self.assertEqual(order.total_amount, Decimal("14.99"))
+        self.assertIn("Less spicy", order.notes)
+        self.assertIn("Customer added drinks.", order.notes)
+        self.assertIn("Waiter User", order.notes)
+        broadcast_event.assert_called_with("order.items_added", response.data, actor=self.waiter)
+
+    def test_note_only_addition_appends_without_replacing_existing_notes(self):
+        order = Order.objects.create(
+            table_number=15,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.CONFIRMED,
+            notes="No ice",
+        )
+        order.items.create(
+            menu_item=self.menu_item,
+            quantity=1,
+            unit_price=self.menu_item.price,
+            service_station=MenuServiceStation.KITCHEN,
+            offer_percentage=self.menu_item.offer_percentage,
+        )
+        order.recalculate_total()
+
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.patch(
+            f"/api/orders/{order.id}/add_items/",
+            {"note": "Guest asked for extra napkins."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.items.count(), 1)
+        self.assertIn("No ice", order.notes)
+        self.assertIn("Guest asked for extra napkins.", order.notes)
+        self.assertIn("Manager User", order.notes)
+
+    def test_adding_kitchen_item_to_ready_order_reopens_it_to_confirmed(self):
+        order = Order.objects.create(
+            table_number=16,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.READY,
+        )
+        order.items.create(
+            menu_item=self.counter_item,
+            quantity=1,
+            unit_price=self.counter_item.price,
+            service_station=MenuServiceStation.COUNTER,
+            offer_percentage=self.counter_item.offer_percentage,
+            is_served=True,
+            served_at=timezone.now(),
+        )
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(
+            f"/api/orders/{order.id}/add_items/",
+            {"items": [{"menu_item": self.menu_item.id, "quantity": 1}]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.status, OrderStatus.CONFIRMED)
+
+    @patch("apps.orders.serializers.broadcast_order_event")
     def test_manager_can_bill_served_order_with_percentage_discount(self, broadcast_event):
         order = Order.objects.create(
             table_number=8,

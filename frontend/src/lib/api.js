@@ -153,6 +153,10 @@ async function createOrder(payload) {
   return apiRequest("/api/orders/", { method: "POST", body: payload });
 }
 
+async function addItemsToOrder(orderId, payload) {
+  return apiRequest(`/api/orders/${orderId}/add_items/`, { method: "PATCH", body: payload });
+}
+
 async function updateOrderStatus(orderId, status) {
   return apiRequest(`/api/orders/${orderId}/update_status/`, { method: "PATCH", body: { status } });
 }
@@ -263,6 +267,7 @@ async function getStaffReport(query) {
 
 export {
   apiRequest,
+  addItemsToOrder,
   billOrder,
   changePassword,
   createCategory,

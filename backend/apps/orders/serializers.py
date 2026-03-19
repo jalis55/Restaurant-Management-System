@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import UserRole
@@ -250,4 +251,61 @@ class OrderBillingSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": exc.message})
 
         broadcast_order_event("order.billed", OrderSerializer(order, context=self.context).data, actor=request.user)
+        return order
+
+
+class OrderAddItemLineSerializer(serializers.Serializer):
+    menu_item = serializers.PrimaryKeyRelatedField(queryset=MenuItem.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class OrderAddItemsSerializer(serializers.Serializer):
+    items = OrderAddItemLineSerializer(many=True, required=False, default=list)
+    note = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        order = self.context["order"]
+        if order.status not in {OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY}:
+            raise serializers.ValidationError({"detail": "Items can only be added to confirmed, preparing, or ready orders."})
+        if not attrs.get("items") and not attrs.get("note", "").strip():
+            raise serializers.ValidationError({"detail": "Add at least one item or a note."})
+        return attrs
+
+    def save(self, **kwargs):
+        order = self.context["order"]
+        request = self.context["request"]
+        items = self.validated_data["items"]
+        appended_note = self.validated_data.get("note", "").strip()
+        has_new_kitchen_items = False
+
+        for item_data in items:
+            menu_item = item_data["menu_item"]
+            if menu_item.service_station == MenuServiceStation.KITCHEN:
+                has_new_kitchen_items = True
+
+            OrderItem.objects.create(
+                order=order,
+                menu_item=menu_item,
+                quantity=item_data["quantity"],
+                unit_price=menu_item.price,
+                service_station=menu_item.service_station,
+                offer_percentage=menu_item.offer_percentage,
+                notes=item_data.get("notes", ""),
+            )
+
+        if appended_note:
+            actor_name = request.user.get_full_name() or request.user.username
+            note_entry = f"[{timezone.localtime().strftime('%Y-%m-%d %H:%M')}] {actor_name}: {appended_note}"
+            order.notes = f"{order.notes}\n{note_entry}".strip() if order.notes else note_entry
+
+        order.recalculate_total()
+
+        if not order.has_kitchen_items():
+            order.status = OrderStatus.READY
+        elif has_new_kitchen_items and order.status == OrderStatus.READY:
+            order.status = OrderStatus.CONFIRMED
+
+        order.save(update_fields=["notes", "status", "updated_at"])
+        broadcast_order_event("order.items_added", OrderSerializer(order, context=self.context).data, actor=request.user)
         return order
