@@ -3,11 +3,12 @@ import { useState } from "react";
 
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
-import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
+import { Panel, StatCard } from "@/components/section-page-ui";
 import { Button } from "@/components/ui/button";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useAuth } from "@/hooks/use-auth";
 import { createCategory, deleteCategory, listCategories, updateCategory } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 const defaultForm = {
   name: "",
@@ -148,54 +149,60 @@ function MenuCategoriesPage() {
     >
       {message ? <div className="mb-4 rounded-2xl border border-black/6 bg-white px-4 py-3 text-sm text-slate-600">{message}</div> : null}
       <DataState isLoading={isLoading} error={error} empty={!categoryList.length} loadingLabel="Loading categories...">
-        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <Panel eyebrow="Structure" title="Category organization">
-            <div className="grid gap-3">
-              {categoryList.map((category) => (
-                <div key={category.id} className="rounded-2xl border border-black/6 bg-[#f7f7f4] p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-base font-semibold text-slate-950">{category.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">{category.description || "No description"}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{category.items_count} items</span>
+        <Panel eyebrow="Structure" title="Category organization" description="Manage the menu structure in one place, including sort order, status, and linked item counts.">
+          <div className="overflow-hidden rounded-[24px] border border-black/6">
+            <table className="min-w-full border-collapse bg-white">
+              <thead>
+                <tr className="border-b border-black/6 text-left text-sm text-slate-500">
+                  <th className="px-5 py-4 font-medium">Category</th>
+                  <th className="px-5 py-4 font-medium">Description</th>
+                  <th className="px-5 py-4 font-medium">Order</th>
+                  <th className="px-5 py-4 font-medium">Items</th>
+                  <th className="px-5 py-4 font-medium">Status</th>
+                  <th className="px-5 py-4 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categoryList.map((category) => (
+                  <tr key={category.id} className="border-b border-black/6 last:border-b-0">
+                    <td className="px-5 py-4">
+                      <p className="text-[15px] font-medium text-slate-950">{category.name}</p>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{category.description || "No description"}</td>
+                    <td className="px-5 py-4 text-sm font-medium text-slate-700">{category.display_order}</td>
+                    <td className="px-5 py-4">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{category.items_count} items</span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", category.is_active ? "bg-lime-100 text-lime-900" : "bg-red-100 text-red-900")}>
+                        {category.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
                       {canManage ? (
-                        <>
-                          <button className="rounded-xl border border-black/8 bg-white p-2 text-slate-600" onClick={() => openEditModal(category)} type="button">
+                        <div className="flex flex-wrap gap-2">
+                          <button className="rounded-xl border border-black/8 bg-white p-2 text-slate-600 transition hover:bg-slate-50" onClick={() => openEditModal(category)} type="button">
                             <Pencil className="size-4" />
                           </button>
                           <button
-                            className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700"
+                            className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700 transition hover:bg-red-100"
                             disabled={busyId === category.id}
                             onClick={() => handleDelete(category.id)}
                             type="button"
                           >
                             <Trash2 className="size-4" />
                           </button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel eyebrow="Status" title="Category health">
-            <div className="space-y-3">
-              {categoryList.map((category) => (
-                <QueueItem
-                  key={category.id}
-                  title={category.name}
-                  meta={`Display order ${category.display_order}`}
-                  status={category.is_active ? "Active" : "Inactive"}
-                  tone={category.is_active ? "lime" : "red"}
-                />
-              ))}
-            </div>
-          </Panel>
-        </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Read only</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       </DataState>
 
       {isModalOpen ? (

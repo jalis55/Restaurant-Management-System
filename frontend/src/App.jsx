@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { LoginPage } from "@/pages/login-page";
 import { MenuCategoriesPage } from "@/pages/menu-categories-page";
 import { OperationsBillingPage } from "@/pages/operations-billing-page";
+import { OperationsBillingDetailPage } from "@/pages/operations-billing-detail-page";
 import { MenuItemsPage } from "@/pages/menu-items-page";
 import { ReportsBillsPage } from "@/pages/reports-bills-page";
 import { OperationsOrdersPage } from "@/pages/operations-orders-page";
@@ -51,6 +52,7 @@ function App() {
           <Route index element={<RoleHomeRoute />} />
           <Route path="operations/orders" element={<OperationsOrdersPage />} />
           <Route path="operations/billing" element={<OperationsBillingPage />} />
+          <Route path="operations/billing/:orderId" element={<OperationsBillingDetailPage />} />
           <Route path="operations/orders/new" element={<StaffNewOrderPage />} />
           <Route path="operations/reservations" element={<OperationsReservationsPage />} />
           <Route path="operations/tables" element={<OperationsTablesPage />} />

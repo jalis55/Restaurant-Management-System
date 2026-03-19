@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { DataState } from "@/components/data-state";
 import { PageShell } from "@/components/page-shell";
-import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
+import { Panel, StatCard } from "@/components/section-page-ui";
 import { Button } from "@/components/ui/button";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,6 +43,31 @@ function formatApiError(errorData) {
     .join(" | ");
 }
 
+function getCategorySections(items, categories) {
+  const itemsByCategory = new Map();
+
+  items.forEach((item) => {
+    const key = item.category_name || "Uncategorized";
+    const existingItems = itemsByCategory.get(key) ?? [];
+    itemsByCategory.set(key, [...existingItems, item]);
+  });
+
+  const orderedSections = categories
+    .map((category) => ({
+      name: category.name,
+      items: (itemsByCategory.get(category.name) ?? []).sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name)),
+    }))
+    .filter((section) => section.items.length);
+
+  const uncategorizedItems = (itemsByCategory.get("Uncategorized") ?? []).sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name));
+
+  if (uncategorizedItems.length) {
+    orderedSections.push({ name: "Uncategorized", items: uncategorizedItems });
+  }
+
+  return orderedSections;
+}
+
 function MenuItemsPage() {
   const { user } = useAuth();
   const canManage = user?.role === "admin" || user?.role === "manager";
@@ -54,17 +79,35 @@ function MenuItemsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
+  const [filters, setFilters] = useState({ category: "all", service: "all" });
   const [form, setForm] = useState(defaultForm);
 
   const itemList = items ?? [];
   const categoryList = categories ?? [];
+  const filteredItems = itemList.filter((item) => {
+    if (filters.category !== "all" && String(item.category) !== filters.category) {
+      return false;
+    }
+
+    if (filters.service !== "all" && item.service_station !== filters.service) {
+      return false;
+    }
+
+    return true;
+  });
   const availableCount = itemList.filter((item) => item.is_available).length;
   const featuredCount = itemList.filter((item) => item.is_featured).length;
   const offeredCount = itemList.filter((item) => Number(item.offer_percentage) > 0).length;
+  const categorySections = getCategorySections(filteredItems, categoryList);
 
   function handleChange(event) {
     const { name, type, checked, value } = event.target;
     setForm((currentForm) => ({ ...currentForm, [name]: type === "checkbox" ? checked : value }));
+  }
+
+  function handleFilterChange(event) {
+    const { name, value } = event.target;
+    setFilters((currentFilters) => ({ ...currentFilters, [name]: value }));
   }
 
   function openCreateModal() {
@@ -192,48 +235,98 @@ function MenuItemsPage() {
     >
       {message ? <div className="mb-4 rounded-2xl border border-black/6 bg-white px-4 py-3 text-sm text-slate-600">{message}</div> : null}
       <DataState isLoading={isLoading} error={error} empty={!itemList.length} loadingLabel="Loading menu items...">
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <Panel eyebrow="Availability" title="Menu item control">
-            <div className="overflow-hidden rounded-[24px] border border-black/6">
-              <table className="min-w-full border-collapse bg-white">
-                <thead>
-                  <tr className="border-b border-black/6 text-left text-sm text-slate-500">
-                    <th className="px-5 py-4 font-medium">Item</th>
-                    <th className="px-5 py-4 font-medium">Category</th>
-                    <th className="px-5 py-4 font-medium">Price</th>
-                    <th className="px-5 py-4 font-medium">Offer</th>
-                    <th className="px-5 py-4 font-medium">Service</th>
-                    <th className="px-5 py-4 font-medium">Status</th>
-                    <th className="px-5 py-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itemList.map((item) => (
-                    <tr key={item.id} className="border-b border-black/6 last:border-b-0">
-                      <td className="px-5 py-4">
-                        <p className="text-[15px] font-medium text-slate-950">{item.name}</p>
-                        <p className="mt-1 text-sm text-slate-500">{item.description || "No description"}</p>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-600">{item.category_name}</td>
-                      <td className="px-5 py-4 text-sm text-slate-950">{item.price}</td>
-                      <td className="px-5 py-4">
-                        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", Number(item.offer_percentage) > 0 ? "bg-sky-100 text-sky-900" : "bg-slate-100 text-slate-600")}>
-                          {Number(item.offer_percentage) > 0 ? `${Number(item.offer_percentage).toFixed(0)}% off` : "No offer"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
+        <Panel
+          eyebrow="Catalog"
+          title="Menu item control"
+          description="Review the menu by category, keep pricing and offers clean, and manage what the floor can sell right now."
+        >
+          <div className="grid gap-4 rounded-[24px] border border-black/6 bg-[#f7f7f4] p-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Category filter</span>
+              <select className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="category" onChange={handleFilterChange} value={filters.category}>
+                <option value="all">All categories</option>
+                {categoryList.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Service filter</span>
+              <select className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="service" onChange={handleFilterChange} value={filters.service}>
+                <option value="all">All service modes</option>
+                <option value="kitchen">Kitchen serve</option>
+                <option value="counter">Counter serve</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="space-y-6">
+            {!categorySections.length ? (
+              <div className="rounded-[24px] border border-dashed border-black/10 bg-white px-6 py-10 text-center">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">No matches</p>
+                <p className="mt-2 text-sm text-slate-600">No menu items match the selected category and service filters.</p>
+              </div>
+            ) : null}
+            {categorySections.map((section) => (
+              <section key={section.name} className="rounded-[24px] border border-black/6 bg-[#fcfcfa] p-5">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Category</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-950">{section.name}</h3>
+                  </div>
+                  <p className="text-sm text-slate-500">{section.items.length} item{section.items.length === 1 ? "" : "s"}</p>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  {section.items.map((item) => (
+                    <article key={item.id} className="rounded-[24px] border border-black/6 bg-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-lg font-semibold text-slate-950">{item.name}</h4>
+                            {item.is_featured ? <span className="rounded-full bg-violet-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-900">Featured</span> : null}
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">{item.description || "No description added yet."}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Price</p>
+                          <p className="mt-1 text-2xl font-semibold text-slate-950">{item.price}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
                         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", item.service_station === "counter" ? "bg-cyan-100 text-cyan-900" : "bg-orange-100 text-orange-900")}>
                           {item.service_station === "counter" ? "Counter serve" : "Kitchen serve"}
                         </span>
-                      </td>
-                      <td className="px-5 py-4">
                         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", item.is_available ? "bg-lime-100 text-lime-900" : "bg-red-100 text-red-900")}>
                           {item.is_available ? "Available" : "Unavailable"}
                         </span>
-                      </td>
-                      <td className="px-5 py-4">
+                        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", Number(item.offer_percentage) > 0 ? "bg-sky-100 text-sky-900" : "bg-slate-100 text-slate-600")}>
+                          {Number(item.offer_percentage) > 0 ? `${Number(item.offer_percentage).toFixed(0)}% off` : "No offer"}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 rounded-2xl bg-[#f7f7f4] p-4 sm:grid-cols-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Prep time</p>
+                          <p className="mt-1 text-sm font-medium text-slate-900">{item.preparation_time} min</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Calories</p>
+                          <p className="mt-1 text-sm font-medium text-slate-900">{item.calories ?? "Not set"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Display order</p>
+                          <p className="mt-1 text-sm font-medium text-slate-900">{item.display_order}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
                         {canManage ? (
-                          <div className="flex flex-wrap gap-2">
+                          <>
                             <button
                               className="rounded-xl border border-black/8 bg-[#f7f7f4] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-950 hover:text-white"
                               disabled={busyId === item.id}
@@ -242,46 +335,29 @@ function MenuItemsPage() {
                             >
                               {busyId === item.id ? "Updating..." : item.is_available ? "Disable" : "Enable"}
                             </button>
-                            <button className="rounded-xl border border-black/8 bg-white p-2 text-slate-600" onClick={() => openEditModal(item)} type="button">
+                            <button className="rounded-xl border border-black/8 bg-white p-2 text-slate-600 transition hover:bg-slate-50" onClick={() => openEditModal(item)} type="button">
                               <Pencil className="size-4" />
                             </button>
                             <button
-                              className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700"
+                              className="rounded-xl border border-red-200 bg-red-50 p-2 text-red-700 transition hover:bg-red-100"
                               disabled={busyId === item.id}
                               onClick={() => handleDelete(item.id)}
                               type="button"
                             >
                               <Trash2 className="size-4" />
                             </button>
-                          </div>
+                          </>
                         ) : (
                           <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Read only</span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </article>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
-          <Panel eyebrow="Highlights" title="Featured and unavailable">
-            <div className="space-y-3">
-              {itemList
-                .filter((item) => item.is_featured || !item.is_available || Number(item.offer_percentage) > 0)
-                .slice(0, 5)
-                .map((item) => (
-                  <QueueItem
-                    key={item.id}
-                    title={item.name}
-                    meta={`${item.category_name} · ${item.service_station === "counter" ? "Counter" : "Kitchen"} serve · Prep ${item.preparation_time} min${Number(item.offer_percentage) > 0 ? ` · ${Number(item.offer_percentage).toFixed(0)}% offer` : ""}`}
-                    status={!item.is_available ? "Unavailable" : Number(item.offer_percentage) > 0 ? "Offer live" : "Featured"}
-                    tone={!item.is_available ? "red" : Number(item.offer_percentage) > 0 ? "blue" : "lime"}
-                  />
-                ))}
-            </div>
-          </Panel>
-        </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        </Panel>
       </DataState>
 
       {isModalOpen ? (

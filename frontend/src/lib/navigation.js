@@ -64,6 +64,18 @@ const routeCatalog = [
     highlights: ["Served orders", "Discount controls", "Net totals"],
   },
   {
+    path: "/operations/billing/:orderId",
+    label: "Billing Detail",
+    icon: ReceiptText,
+    section: "Operations",
+    roles: ADMIN_ROLES,
+    eyebrow: "Operations",
+    title: "Finalize Billing",
+    description: "Review one served order in detail and finalize its bill.",
+    highlights: ["Bill items", "Discount review", "Finalize amount"],
+    hidden: true,
+  },
+  {
     path: "/operations/reservations",
     label: "Reservations",
     icon: ListChecks,
@@ -249,16 +261,40 @@ function getDefaultPathForRole(role) {
 }
 
 function canAccessPath(role, path) {
-  const route = routeCatalog.find((item) => item.path === path);
+  const route = routeCatalog.find((item) => {
+    if (item.path === path) {
+      return true;
+    }
+
+    if (!item.path.includes(":")) {
+      return false;
+    }
+
+    const pattern = new RegExp(`^${item.path.replace(/:[^/]+/g, "[^/]+")}$`);
+    return pattern.test(path);
+  });
   return route ? route.roles.includes(role) : false;
 }
 
 function getRouteMeta(path) {
-  return routeCatalog.find((item) => item.path === path) ?? null;
+  return (
+    routeCatalog.find((item) => {
+      if (item.path === path) {
+        return true;
+      }
+
+      if (!item.path.includes(":")) {
+        return false;
+      }
+
+      const pattern = new RegExp(`^${item.path.replace(/:[^/]+/g, "[^/]+")}$`);
+      return pattern.test(path);
+    }) ?? null
+  );
 }
 
 function getNavigationGroupsForRole(role) {
-  const visibleRoutes = routeCatalog.filter((item) => item.roles.includes(role));
+  const visibleRoutes = routeCatalog.filter((item) => item.roles.includes(role) && !item.hidden);
 
   return sectionOrder
     .map((section) => ({
