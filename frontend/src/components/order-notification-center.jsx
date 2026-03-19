@@ -128,11 +128,13 @@ function shouldNotifyUser(event, role) {
 }
 
 function isSelfPublishedEvent(event, userId) {
-  if (!userId) {
+  const actorId = event?.actor?.id;
+
+  if (!userId || actorId === undefined || actorId === null) {
     return false;
   }
 
-  return event?.actor?.id === userId;
+  return String(actorId) === String(userId);
 }
 
 function getToneClasses(tone) {

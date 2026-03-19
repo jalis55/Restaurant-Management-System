@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useOrderEvents } from "@/hooks/use-order-events";
 import { listKitchenOrders, updateOrderStatus } from "@/lib/api";
-import { formatOrderStatus, getNextOrderStatuses, getOrderTone } from "@/lib/order-utils";
+import { formatOrderStatus, getNextOrderStatuses, getOrderActionButtonClass, getOrderTone } from "@/lib/order-utils";
 
 
 function isKitchenOrder(order) {
@@ -108,7 +108,7 @@ function StaffKitchenDisplayPage() {
                   {getKitchenNextStatuses(order.status).map((nextStatus) => (
                     <button
                       key={nextStatus}
-                      className="rounded-xl border border-black/8 bg-[#f7f7f4] px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-950 hover:text-white"
+                      className={getOrderActionButtonClass(nextStatus)}
                       disabled={busyId === order.id}
                       onClick={() => handleStatusChange(order.id, nextStatus)}
                       type="button"
