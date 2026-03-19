@@ -11,7 +11,7 @@ import { formatOrderStatus, getNextOrderStatuses, getOrderActionButtonClass, get
 
 
 function isKitchenOrder(order) {
-  return ["pending", "confirmed", "preparing", "ready"].includes(order.status);
+  return ["pending", "confirmed", "preparing", "ready"].includes(order.status) && order.items.some((item) => item.service_station === "kitchen");
 }
 
 
@@ -100,7 +100,7 @@ function StaffKitchenDisplayPage() {
               <div key={order.id} className="rounded-2xl border border-black/6 p-4">
                 <QueueItem
                   title={`${order.order_number}${order.table_number ? ` · Table ${order.table_number}` : ""}`}
-                  meta={order.items.map((item) => `${item.menu_item_name} x${item.quantity}`).join(", ")}
+                  meta={order.items.filter((item) => item.service_station === "kitchen").map((item) => `${item.menu_item_name} x${item.quantity}`).join(", ")}
                   status={formatOrderStatus(order.status)}
                   tone={getOrderTone(order.status)}
                 />

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.accounts.models import UserRole
-from apps.menu.models import MenuItem
+from apps.menu.models import MenuItem, MenuServiceStation
 from apps.orders.events import broadcast_order_event
 from apps.orders.models import BillingDiscountType, Order, OrderItem, OrderStatus, OrderType
 from apps.preferences.models import BillingSettings
@@ -12,11 +12,14 @@ from apps.preferences.models import BillingSettings
 
 class OrderItemSerializer(serializers.ModelSerializer):
     menu_item_name = serializers.CharField(source="menu_item.name", read_only=True)
+    service_station = serializers.CharField(read_only=True)
+    is_served = serializers.BooleanField(read_only=True)
+    served_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ["id", "menu_item", "menu_item_name", "quantity", "unit_price", "offer_percentage", "notes"]
-        read_only_fields = ["id", "menu_item_name", "unit_price", "offer_percentage"]
+        fields = ["id", "menu_item", "menu_item_name", "quantity", "unit_price", "service_station", "offer_percentage", "is_served", "served_at", "notes"]
+        read_only_fields = ["id", "menu_item_name", "unit_price", "service_station", "offer_percentage", "is_served", "served_at"]
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -97,10 +100,14 @@ class OrderSerializer(serializers.ModelSerializer):
                 menu_item=menu_item,
                 quantity=item_data["quantity"],
                 unit_price=menu_item.price,
+                service_station=menu_item.service_station,
                 offer_percentage=menu_item.offer_percentage,
                 notes=item_data.get("notes", ""),
             )
         order.recalculate_total()
+        if not order.has_kitchen_items():
+            order.status = OrderStatus.READY
+            order.save(update_fields=["status", "updated_at"])
         broadcast_order_event("order.created", OrderSerializer(order, context=self.context).data, actor=self.context["request"].user)
         return order
 
@@ -118,10 +125,14 @@ class OrderSerializer(serializers.ModelSerializer):
                     menu_item=menu_item,
                     quantity=item_data["quantity"],
                     unit_price=menu_item.price,
+                    service_station=menu_item.service_station,
                     offer_percentage=menu_item.offer_percentage,
                     notes=item_data.get("notes", ""),
                 )
             instance.recalculate_total()
+            if not instance.has_kitchen_items() and instance.status == OrderStatus.PENDING:
+                instance.status = OrderStatus.READY
+                instance.save(update_fields=["status", "updated_at"])
         return instance
 
 
@@ -144,10 +155,36 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
     def save(self, **kwargs):
         order = self.context["order"]
         try:
+            if self.validated_data["status"] == OrderStatus.SERVED:
+                order.mark_counter_items_served()
             order.update_status(self.validated_data["status"])
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message)
         broadcast_order_event("order.status_updated", OrderSerializer(order, context=self.context).data, actor=self.context["request"].user)
+        return order
+
+
+class CounterItemServeSerializer(serializers.Serializer):
+    def validate(self, attrs):
+        request = self.context["request"]
+        if getattr(request.user, "role", None) == UserRole.KITCHEN:
+            raise serializers.ValidationError({"detail": "Kitchen cannot serve counter items."})
+        return attrs
+
+    def save(self, **kwargs):
+        order = self.context["order"]
+        request = self.context["request"]
+        updated_count = order.mark_counter_items_served()
+        if not updated_count:
+            raise serializers.ValidationError({"detail": "No pending counter-serve items found for this order."})
+        order.refresh_from_db()
+
+        if not order.has_kitchen_items() and order.status == OrderStatus.READY:
+            order.update_status(OrderStatus.SERVED)
+            broadcast_order_event("order.status_updated", OrderSerializer(order, context=self.context).data, actor=request.user)
+            return order
+
+        broadcast_order_event("order.counter_items_served", OrderSerializer(order, context=self.context).data, actor=request.user)
         return order
 
 

@@ -9,7 +9,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.menu.models import Category, MenuItem
+from apps.menu.models import Category, MenuItem, MenuServiceStation
 from apps.orders.models import Order, OrderStatus, OrderType
 from apps.preferences.models import BillingSettings
 from apps.reservations.models import Reservation, ReservationStatus, Table
@@ -70,6 +70,15 @@ class BaseAPITestCase(TestCase):
             price=Decimal("5.50"),
             is_featured=True,
             preparation_time=5,
+        )
+        self.counter_item = MenuItem.objects.create(
+            category=self.category,
+            name="Coke",
+            description="Cold drink",
+            price=Decimal("2.50"),
+            service_station=MenuServiceStation.COUNTER,
+            is_featured=False,
+            preparation_time=1,
         )
         self.table = Table.objects.create(number=1, capacity=4, location="Main Hall")
 
@@ -376,6 +385,62 @@ class OrdersAPITests(BaseAPITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_counter_only_order_starts_ready_and_stays_out_of_kitchen_queue(self):
+        waiter_client = self.auth_client(self.waiter)
+        create_response = waiter_client.post(
+            "/api/orders/",
+            {
+                "table_number": 11,
+                "order_type": OrderType.DINE_IN,
+                "items": [
+                    {
+                        "menu_item": self.counter_item.id,
+                        "quantity": 2,
+                        "notes": "Serve chilled",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["status"], OrderStatus.READY)
+
+        kitchen_client = self.auth_client(self.kitchen)
+        kitchen_response = kitchen_client.get("/api/orders/kitchen/")
+        self.assertEqual(kitchen_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(any(row["id"] == create_response.data["id"] for row in kitchen_response.data))
+
+    def test_waiter_can_serve_counter_items_without_changing_kitchen_flow(self):
+        order = Order.objects.create(
+            table_number=13,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.PENDING,
+        )
+        order.items.create(
+            menu_item=self.menu_item,
+            quantity=1,
+            unit_price=self.menu_item.price,
+            service_station=MenuServiceStation.KITCHEN,
+            offer_percentage=self.menu_item.offer_percentage,
+        )
+        counter_line = order.items.create(
+            menu_item=self.counter_item,
+            quantity=1,
+            unit_price=self.counter_item.price,
+            service_station=MenuServiceStation.COUNTER,
+            offer_percentage=self.counter_item.offer_percentage,
+        )
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(f"/api/orders/{order.id}/serve_counter_items/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        counter_line.refresh_from_db()
+        self.assertEqual(order.status, OrderStatus.PENDING)
+        self.assertTrue(counter_line.is_served)
 
     def test_kitchen_cannot_serve_or_cancel_ready_order(self):
         order = Order.objects.create(

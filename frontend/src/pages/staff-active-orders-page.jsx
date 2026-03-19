@@ -6,7 +6,7 @@ import { Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAuth } from "@/hooks/use-auth";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useOrderEvents } from "@/hooks/use-order-events";
-import { listActiveOrders, updateOrderStatus } from "@/lib/api";
+import { listActiveOrders, serveCounterItems, updateOrderStatus } from "@/lib/api";
 import { formatOrderStatus, getNextOrderStatuses, getOrderActionButtonClass, getOrderTone } from "@/lib/order-utils";
 
 
@@ -25,6 +25,17 @@ function getWaiterNextStatuses(status) {
   }
 
   return [];
+}
+
+function getCounterServeSummary(order) {
+  const counterItems = order.items.filter((item) => item.service_station === "counter");
+
+  if (!counterItems.length) {
+    return "";
+  }
+
+  const servedCount = counterItems.filter((item) => item.is_served).length;
+  return `Counter ${servedCount}/${counterItems.length} served`;
 }
 
 function StaffActiveOrdersPage() {
@@ -72,10 +83,31 @@ function StaffActiveOrdersPage() {
 
     try {
       const updatedOrder = await updateOrderStatus(orderId, status);
-      setOrders((currentOrders) => currentOrders.map((order) => (order.id === orderId ? updatedOrder : order)));
+      setOrders((currentOrders) => {
+        const nextOrders = (currentOrders ?? []).map((order) => (order.id === orderId ? updatedOrder : order));
+        return nextOrders.filter(isActiveOrder);
+      });
       setMessage(`Order moved to ${formatOrderStatus(status)}.`);
     } catch (actionError) {
       setMessage(actionError?.data?.detail || actionError.message || "Unable to update the order.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCounterServe(orderId) {
+    setBusyId(orderId);
+    setMessage("");
+
+    try {
+      const updatedOrder = await serveCounterItems(orderId);
+      setOrders((currentOrders) => {
+        const nextOrders = (currentOrders ?? []).map((order) => (order.id === orderId ? updatedOrder : order));
+        return nextOrders.filter(isActiveOrder);
+      });
+      setMessage(`Counter-serve items completed for ${updatedOrder.order_number}.`);
+    } catch (actionError) {
+      setMessage(actionError?.data?.detail || actionError.message || "Unable to serve counter items.");
     } finally {
       setBusyId(null);
     }
@@ -101,11 +133,33 @@ function StaffActiveOrdersPage() {
                 <div key={order.id} className="rounded-2xl border border-black/6 p-4">
                   <QueueItem
                     title={`${order.order_number}${order.table_number ? ` · Table ${order.table_number}` : ""}`}
-                    meta={`${order.order_type.replace("_", " ")} · ${order.items.length} line items`}
+                    meta={`${order.order_type.replace("_", " ")} · ${order.items.length} line items${getCounterServeSummary(order) ? ` · ${getCounterServeSummary(order)}` : ""}`}
                     status={formatOrderStatus(order.status)}
                     tone={getOrderTone(order.status)}
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {order.items
+                      .filter((item) => item.service_station === "counter")
+                      .map((item) => (
+                        <span
+                          key={item.id}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${item.is_served ? "border-lime-200 bg-lime-50 text-lime-900" : "border-cyan-200 bg-cyan-50 text-cyan-900"}`}
+                        >
+                          {item.menu_item_name} · {item.is_served ? "Counter served" : "Counter pending"}
+                        </span>
+                      ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {order.items.some((item) => item.service_station === "counter" && !item.is_served) ? (
+                      <button
+                        className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-900 transition hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-55"
+                        disabled={busyId === order.id}
+                        onClick={() => handleCounterServe(order.id)}
+                        type="button"
+                      >
+                        {busyId === order.id ? "Updating..." : "Serve counter items"}
+                      </button>
+                    ) : null}
                     {getWaiterNextStatuses(order.status).map((nextStatus) => (
                       <button
                         key={nextStatus}

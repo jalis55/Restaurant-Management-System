@@ -172,7 +172,7 @@ function StaffNewOrderPage() {
                       <option value="">Select item</option>
                       {menuItems.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name}
+                          {item.name} · {item.service_station === "counter" ? "Counter" : "Kitchen"}
                         </option>
                       ))}
                     </select>
@@ -198,9 +198,9 @@ function StaffNewOrderPage() {
                 <QueueItem
                   key={`${line.menu_item}-${index}`}
                   title={`${line.menuItem?.name || "Menu item"} x${line.quantity}`}
-                  meta={line.notes || "No line notes"}
+                  meta={`${line.menuItem?.service_station === "counter" ? "Counter serve" : "Kitchen serve"} · ${line.notes || "No line notes"}`}
                   status={`$${(Number(line.menuItem?.price || 0) * Number(line.quantity)).toFixed(2)}`}
-                  tone="blue"
+                  tone={line.menuItem?.service_station === "counter" ? "blue" : "orange"}
                 />
               ))}
               {!selectedItems.length ? <div className="rounded-2xl border border-black/6 p-4 text-sm text-slate-500">Select menu items to preview the order.</div> : null}

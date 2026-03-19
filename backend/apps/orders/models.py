@@ -8,7 +8,7 @@ from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.menu.models import MenuItem
+from apps.menu.models import MenuItem, MenuServiceStation
 
 
 class OrderType(models.TextChoices):
@@ -170,6 +170,17 @@ class Order(models.Model):
             ]
         )
 
+    def has_kitchen_items(self) -> bool:
+        return self.items.filter(service_station=MenuServiceStation.KITCHEN).exists()
+
+    def has_unserved_counter_items(self) -> bool:
+        return self.items.filter(service_station=MenuServiceStation.COUNTER, is_served=False).exists()
+
+    def mark_counter_items_served(self):
+        now = timezone.now()
+        updated = self.items.filter(service_station=MenuServiceStation.COUNTER, is_served=False).update(is_served=True, served_at=now)
+        return updated
+
     def update_status(self, new_status: str):
         allowed = OrderStatus.allowed_transitions()[self.status]
         if new_status not in allowed:
@@ -211,12 +222,15 @@ class OrderItem(models.Model):
     menu_item = models.ForeignKey(MenuItem, on_delete=models.PROTECT, related_name="order_items")
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    service_station = models.CharField(max_length=20, choices=MenuServiceStation.choices, default=MenuServiceStation.KITCHEN)
     offer_percentage = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal("0.00"),
         validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
+    is_served = models.BooleanField(default=False)
+    served_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
     class Meta:

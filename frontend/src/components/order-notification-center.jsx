@@ -124,6 +124,10 @@ function shouldNotifyUser(event, role) {
     return false;
   }
 
+  if (role === "kitchen" && !(event?.order?.items ?? []).some((item) => item.service_station === "kitchen")) {
+    return false;
+  }
+
   return (ROLE_VISIBILITY[descriptor.audienceKey] ?? []).includes(role);
 }
 

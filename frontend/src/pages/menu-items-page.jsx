@@ -20,6 +20,7 @@ const defaultForm = {
   is_featured: false,
   name: "",
   offer_percentage: "0.00",
+  service_station: "kitchen",
   preparation_time: 15,
   price: "",
 };
@@ -85,6 +86,7 @@ function MenuItemsPage() {
       is_featured: item.is_featured,
       name: item.name,
       offer_percentage: Number(item.offer_percentage ?? 0).toFixed(2),
+      service_station: item.service_station ?? "kitchen",
       preparation_time: item.preparation_time,
       price: item.price,
     });
@@ -140,6 +142,7 @@ function MenuItemsPage() {
       category: Number(form.category),
       display_order: Number(form.display_order),
       offer_percentage: form.offer_percentage,
+      service_station: form.service_station,
       preparation_time: Number(form.preparation_time),
       price: form.price,
     };
@@ -199,6 +202,7 @@ function MenuItemsPage() {
                     <th className="px-5 py-4 font-medium">Category</th>
                     <th className="px-5 py-4 font-medium">Price</th>
                     <th className="px-5 py-4 font-medium">Offer</th>
+                    <th className="px-5 py-4 font-medium">Service</th>
                     <th className="px-5 py-4 font-medium">Status</th>
                     <th className="px-5 py-4 font-medium">Actions</th>
                   </tr>
@@ -215,6 +219,11 @@ function MenuItemsPage() {
                       <td className="px-5 py-4">
                         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", Number(item.offer_percentage) > 0 ? "bg-sky-100 text-sky-900" : "bg-slate-100 text-slate-600")}>
                           {Number(item.offer_percentage) > 0 ? `${Number(item.offer_percentage).toFixed(0)}% off` : "No offer"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", item.service_station === "counter" ? "bg-cyan-100 text-cyan-900" : "bg-orange-100 text-orange-900")}>
+                          {item.service_station === "counter" ? "Counter serve" : "Kitchen serve"}
                         </span>
                       </td>
                       <td className="px-5 py-4">
@@ -265,7 +274,7 @@ function MenuItemsPage() {
                   <QueueItem
                     key={item.id}
                     title={item.name}
-                    meta={`${item.category_name} · Prep ${item.preparation_time} min${Number(item.offer_percentage) > 0 ? ` · ${Number(item.offer_percentage).toFixed(0)}% offer` : ""}`}
+                    meta={`${item.category_name} · ${item.service_station === "counter" ? "Counter" : "Kitchen"} serve · Prep ${item.preparation_time} min${Number(item.offer_percentage) > 0 ? ` · ${Number(item.offer_percentage).toFixed(0)}% offer` : ""}`}
                     status={!item.is_available ? "Unavailable" : Number(item.offer_percentage) > 0 ? "Offer live" : "Featured"}
                     tone={!item.is_available ? "red" : Number(item.offer_percentage) > 0 ? "blue" : "lime"}
                   />
@@ -314,6 +323,14 @@ function MenuItemsPage() {
                   </select>
                 </label>
               </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Service mode</span>
+                <select className="w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="service_station" onChange={handleChange} value={form.service_station}>
+                  <option value="kitchen">Kitchen serve</option>
+                  <option value="counter">Counter serve</option>
+                </select>
+              </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Description</span>

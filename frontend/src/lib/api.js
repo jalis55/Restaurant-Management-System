@@ -157,6 +157,10 @@ async function updateOrderStatus(orderId, status) {
   return apiRequest(`/api/orders/${orderId}/update_status/`, { method: "PATCH", body: { status } });
 }
 
+async function serveCounterItems(orderId) {
+  return apiRequest(`/api/orders/${orderId}/serve_counter_items/`, { method: "PATCH", body: {} });
+}
+
 async function billOrder(orderId, payload) {
   return apiRequest(`/api/orders/${orderId}/bill/`, { method: "PATCH", body: payload });
 }
@@ -291,6 +295,7 @@ export {
   login,
   logout,
   refreshSession,
+  serveCounterItems,
   toggleMenuItemAvailability,
   updateCategory,
   updateBillingSettings,

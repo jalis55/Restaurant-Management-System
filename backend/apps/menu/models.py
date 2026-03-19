@@ -2,6 +2,11 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
+class MenuServiceStation(models.TextChoices):
+    KITCHEN = "kitchen", "Kitchen"
+    COUNTER = "counter", "Counter"
+
+
 class Category(models.Model):
     name = models.CharField(max_length=120, unique=True)
     description = models.TextField(blank=True)
@@ -23,6 +28,7 @@ class MenuItem(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     image = models.URLField(blank=True)
+    service_station = models.CharField(max_length=20, choices=MenuServiceStation.choices, default=MenuServiceStation.KITCHEN)
     offer_percentage = models.DecimalField(
         max_digits=5,
         decimal_places=2,
