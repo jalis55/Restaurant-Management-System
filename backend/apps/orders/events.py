@@ -2,7 +2,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 
-def broadcast_order_event(event_type: str, payload: dict):
+def broadcast_order_event(event_type: str, payload: dict, *, actor=None):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
         "orders",
@@ -11,6 +11,13 @@ def broadcast_order_event(event_type: str, payload: dict):
             "payload": {
                 "type": event_type,
                 "order": payload,
+                "actor": {
+                    "id": actor.id,
+                    "role": getattr(actor, "role", None),
+                    "name": actor.get_full_name() or actor.username,
+                }
+                if actor
+                else None,
             },
         },
     )

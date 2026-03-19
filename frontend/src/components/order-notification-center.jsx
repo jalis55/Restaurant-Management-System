@@ -127,6 +127,14 @@ function shouldNotifyUser(event, role) {
   return (ROLE_VISIBILITY[descriptor.audienceKey] ?? []).includes(role);
 }
 
+function isSelfPublishedEvent(event, userId) {
+  if (!userId) {
+    return false;
+  }
+
+  return event?.actor?.id === userId;
+}
+
 function getToneClasses(tone) {
   if (tone === "lime") {
     return "border-lime-200 bg-lime-50/95 text-lime-950";
@@ -182,12 +190,24 @@ function playNotificationSound(soundConfig, audioContextRef) {
   }
 }
 
+function shouldPersistNotificationForRole(role, status) {
+  if (role === "waiter" || role === "kitchen") {
+    return true;
+  }
+
+  if (role === "manager" || role === "admin") {
+    return status === "served";
+  }
+
+  return false;
+}
+
 function OrderNotificationCenter() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const seenEventsRef = useRef(new Set());
-  const timeoutIdsRef = useRef(new Map());
   const audioContextRef = useRef(null);
+  const timeoutIdsRef = useRef(new Map());
   const userRole = user?.role;
   const userId = user?.id;
 
@@ -200,7 +220,7 @@ function OrderNotificationCenter() {
       event?.order?.updated_at ?? event?.order?.created_at ?? "na",
     ].join(":");
 
-    if (!descriptor || !shouldNotifyUser(event, userRole) || seenEventsRef.current.has(eventKey)) {
+    if (!descriptor || !shouldNotifyUser(event, userRole) || isSelfPublishedEvent(event, userId) || seenEventsRef.current.has(eventKey)) {
       return;
     }
 
@@ -212,6 +232,7 @@ function OrderNotificationCenter() {
       title: descriptor.title,
       body: descriptor.body,
       tone: descriptor.tone,
+      isPersistent: shouldPersistNotificationForRole(userRole, event.order.status),
       status: event.order.status,
       orderNumber: event.order.order_number,
       Icon: descriptor.Icon,
@@ -222,7 +243,7 @@ function OrderNotificationCenter() {
 
   useEffect(() => {
     notifications.slice(0, MAX_VISIBLE_NOTIFICATIONS).forEach((notification) => {
-      if (timeoutIdsRef.current.has(notification.id)) {
+      if (notification.isPersistent || timeoutIdsRef.current.has(notification.id)) {
         return;
       }
 

@@ -346,7 +346,7 @@ class OrdersAPITests(BaseAPITestCase):
         order = Order.objects.get(pk=create_response.data["id"])
         self.assertEqual(order.total_amount, Decimal("19.98"))
         self.assertEqual(order.status, OrderStatus.PENDING)
-        broadcast_event.assert_called_with("order.created", create_response.data)
+        broadcast_event.assert_called_with("order.created", create_response.data, actor=self.waiter)
 
         kitchen_client = self.auth_client(self.kitchen)
         update_response = kitchen_client.patch(
@@ -487,7 +487,7 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertEqual(order.final_amount, Decimal("17.98"))
         self.assertEqual(order.billed_by, self.manager)
         self.assertIsNotNone(order.billed_at)
-        broadcast_event.assert_called_with("order.billed", response.data)
+        broadcast_event.assert_called_with("order.billed", response.data, actor=self.manager)
 
     def test_manager_cannot_bill_order_before_it_is_served(self):
         order = Order.objects.create(

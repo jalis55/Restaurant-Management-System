@@ -87,7 +87,7 @@ class OrderSerializer(serializers.ModelSerializer):
                 notes=item_data.get("notes", ""),
             )
         order.recalculate_total()
-        broadcast_order_event("order.created", OrderSerializer(order, context=self.context).data)
+        broadcast_order_event("order.created", OrderSerializer(order, context=self.context).data, actor=self.context["request"].user)
         return order
 
     def update(self, instance, validated_data):
@@ -132,7 +132,7 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
             order.update_status(self.validated_data["status"])
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message)
-        broadcast_order_event("order.status_updated", OrderSerializer(order, context=self.context).data)
+        broadcast_order_event("order.status_updated", OrderSerializer(order, context=self.context).data, actor=self.context["request"].user)
         return order
 
 
@@ -183,5 +183,5 @@ class OrderBillingSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"detail": exc.message})
 
-        broadcast_order_event("order.billed", OrderSerializer(order, context=self.context).data)
+        broadcast_order_event("order.billed", OrderSerializer(order, context=self.context).data, actor=request.user)
         return order
