@@ -128,7 +128,7 @@ def build_header(order) -> Table:
     ts_style       = make_style("h_ts",    size=9, color=C["header_muted"], align=TA_RIGHT)
 
     data = [
-        [Paragraph("Restaurant Bill", title_style),
+        [Paragraph("Bill", title_style),
          Paragraph(order.order_number, ordnum_style)],
         [Paragraph("Finalized order receipt and billing summary", subtitle_style),
          Paragraph(billed_at, ts_style)],

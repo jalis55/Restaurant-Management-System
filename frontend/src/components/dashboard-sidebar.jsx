@@ -27,7 +27,7 @@ function SidebarLink({ item, onNavigate }) {
   return (
     <NavLink
       to={item.to}
-      end={item.to === "/"}
+      end
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
