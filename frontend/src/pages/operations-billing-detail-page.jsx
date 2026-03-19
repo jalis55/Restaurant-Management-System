@@ -81,6 +81,7 @@ function OperationsBillingDetailPage() {
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listOrders());
   const { data: billingSettings, error: billingSettingsError, isLoading: isBillingSettingsLoading } = useAsyncData(() => getBillingSettings());
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [initializedOrderId, setInitializedOrderId] = useState(null);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -94,8 +95,13 @@ function OperationsBillingDetailPage() {
       return;
     }
 
+    if (String(initializedOrderId) === String(order.id)) {
+      return;
+    }
+
     setForm(createFormState(order));
-  }, [order]);
+    setInitializedOrderId(order.id);
+  }, [initializedOrderId, order]);
 
   useEffect(() => {
     const intervalId = window.setInterval(async () => {

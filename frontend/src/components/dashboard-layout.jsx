@@ -30,15 +30,15 @@ function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#fdfdf9_0%,_#f3f3ee_42%,_#ecece6_100%)] px-3 py-3 sm:px-4 sm:py-4 lg:p-6">
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#fdfdf9_0%,_#f3f3ee_42%,_#ecece6_100%)]">
       <OrderNotificationCenter />
-      <div className="mx-auto flex h-[calc(100vh-1.5rem)] max-w-[1460px] overflow-hidden rounded-[36px] border border-black/5 bg-[#fbfbf8] shadow-[0_25px_80px_rgba(15,23,42,0.08)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)]">
+      <div className="flex h-screen w-full overflow-hidden bg-[#fbfbf8]">
         <DashboardSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f6f6f3]">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-          <MobileTopbar onOpen={() => setMobileOpen(true)} />
-          <Outlet />
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+            <MobileTopbar onOpen={() => setMobileOpen(true)} />
+            <Outlet />
           </div>
         </main>
       </div>
