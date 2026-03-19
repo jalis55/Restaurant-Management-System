@@ -2,6 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
@@ -50,6 +51,21 @@ class Order(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="orders")
     notes = models.TextField(blank=True)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    tax_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    service_charge_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    service_charge_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    menu_offer_discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     discount_type = models.CharField(max_length=20, choices=BillingDiscountType.choices, default=BillingDiscountType.NONE)
     discount_value = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
@@ -85,8 +101,33 @@ class Order(models.Model):
         stamp = timezone.localtime().strftime("%Y%m%d%H%M%S")
         return f"ORD-{stamp}-{uuid4().hex[:6].upper()}"
 
-    def calculate_discount_amount(self) -> Decimal:
+    def calculate_tax_amount(self) -> Decimal:
         total = self.total_amount or Decimal("0.00")
+        percentage = self.tax_percentage or Decimal("0.00")
+        return ((total * percentage) / Decimal("100")).quantize(Decimal("0.01"))
+
+    def calculate_service_charge_amount(self) -> Decimal:
+        total = self.total_amount or Decimal("0.00")
+        percentage = self.service_charge_percentage or Decimal("0.00")
+        return ((total * percentage) / Decimal("100")).quantize(Decimal("0.01"))
+
+    def calculate_menu_offer_discount_amount(self, gross_total: Decimal) -> Decimal:
+        subtotal = self.total_amount or Decimal("0.00")
+
+        if subtotal <= 0 or gross_total <= 0:
+            return Decimal("0.00")
+
+        multiplier = gross_total / subtotal
+        offer_discount = Decimal("0.00")
+
+        for item in self.items.all():
+            item_subtotal = (item.quantity * item.unit_price).quantize(Decimal("0.01"))
+            offer_discount += item_subtotal * ((item.offer_percentage or Decimal("0.00")) / Decimal("100")) * multiplier
+
+        return min(gross_total, offer_discount).quantize(Decimal("0.01"))
+
+    def calculate_discount_amount(self, base_total: Decimal | None = None) -> Decimal:
+        total = base_total if base_total is not None else (self.total_amount or Decimal("0.00"))
         discount_value = self.discount_value or Decimal("0.00")
 
         if self.discount_type == BillingDiscountType.AMOUNT:
@@ -102,8 +143,14 @@ class Order(models.Model):
         return min(total, discount_amount).quantize(Decimal("0.01"))
 
     def sync_billing_totals(self):
-        self.discount_amount = self.calculate_discount_amount()
-        self.final_amount = (self.total_amount - self.discount_amount).quantize(Decimal("0.01"))
+        subtotal = self.total_amount or Decimal("0.00")
+        self.tax_amount = self.calculate_tax_amount()
+        self.service_charge_amount = self.calculate_service_charge_amount()
+        gross_total = (subtotal + self.tax_amount + self.service_charge_amount).quantize(Decimal("0.01"))
+        self.menu_offer_discount_amount = self.calculate_menu_offer_discount_amount(gross_total)
+        discount_base = max(Decimal("0.00"), gross_total - self.menu_offer_discount_amount).quantize(Decimal("0.01"))
+        self.discount_amount = self.calculate_discount_amount(base_total=discount_base)
+        self.final_amount = max(Decimal("0.00"), discount_base - self.discount_amount).quantize(Decimal("0.01"))
 
     def recalculate_total(self):
         total = self.items.aggregate(
@@ -111,7 +158,17 @@ class Order(models.Model):
         )["total"] or Decimal("0.00")
         self.total_amount = total.quantize(Decimal("0.01"))
         self.sync_billing_totals()
-        self.save(update_fields=["total_amount", "discount_amount", "final_amount", "updated_at"])
+        self.save(
+            update_fields=[
+                "total_amount",
+                "tax_amount",
+                "service_charge_amount",
+                "menu_offer_discount_amount",
+                "discount_amount",
+                "final_amount",
+                "updated_at",
+            ]
+        )
 
     def update_status(self, new_status: str):
         allowed = OrderStatus.allowed_transitions()[self.status]
@@ -120,17 +177,24 @@ class Order(models.Model):
         self.status = new_status
         self.save(update_fields=["status", "updated_at"])
 
-    def apply_billing(self, *, discount_type: str, discount_value: Decimal, billed_by):
+    def apply_billing(self, *, discount_type: str, discount_value: Decimal, tax_percentage: Decimal, service_charge_percentage: Decimal, billed_by):
         if self.status != OrderStatus.SERVED:
             raise ValidationError("Only served orders can be billed.")
 
         self.discount_type = discount_type
         self.discount_value = discount_value.quantize(Decimal("0.01"))
+        self.tax_percentage = tax_percentage.quantize(Decimal("0.01"))
+        self.service_charge_percentage = service_charge_percentage.quantize(Decimal("0.01"))
         self.sync_billing_totals()
         self.billed_at = timezone.now()
         self.billed_by = billed_by
         self.save(
             update_fields=[
+                "tax_percentage",
+                "tax_amount",
+                "service_charge_percentage",
+                "service_charge_amount",
+                "menu_offer_discount_amount",
                 "discount_type",
                 "discount_value",
                 "discount_amount",
@@ -147,6 +211,12 @@ class OrderItem(models.Model):
     menu_item = models.ForeignKey(MenuItem, on_delete=models.PROTECT, related_name="order_items")
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    offer_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
     notes = models.TextField(blank=True)
 
     class Meta:

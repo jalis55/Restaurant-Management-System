@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.menu",
     "apps.orders",
+    "apps.preferences",
     "apps.reservations",
     "apps.reports",
     "corsheaders",
@@ -166,6 +167,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "orders", "description": "Orders and kitchen workflow"},
         {"name": "reservations", "description": "Tables and reservations"},
         {"name": "reports", "description": "Management reporting endpoints"},
+        {"name": "settings", "description": "Restaurant-wide configuration"},
     ],
 }
 

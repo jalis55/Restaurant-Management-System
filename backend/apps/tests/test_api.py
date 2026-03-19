@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from apps.menu.models import Category, MenuItem
 from apps.orders.models import Order, OrderStatus, OrderType
+from apps.preferences.models import BillingSettings
 from apps.reservations.models import Reservation, ReservationStatus, Table
 
 User = get_user_model()
@@ -489,6 +490,42 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertIsNotNone(order.billed_at)
         broadcast_event.assert_called_with("order.billed", response.data, actor=self.manager)
 
+    def test_manager_billing_applies_menu_offer_then_tax_and_service_charge(self):
+        self.menu_item.offer_percentage = Decimal("20.00")
+        self.menu_item.save(update_fields=["offer_percentage"])
+        billing_settings = BillingSettings.get_solo()
+        billing_settings.tax_percentage = Decimal("10.00")
+        billing_settings.service_charge_percentage = Decimal("5.00")
+        billing_settings.save()
+        order = Order.objects.create(
+            table_number=12,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.SERVED,
+        )
+        order.items.create(
+            menu_item=self.menu_item,
+            quantity=2,
+            unit_price=self.menu_item.price,
+            offer_percentage=self.menu_item.offer_percentage,
+        )
+        order.recalculate_total()
+
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.patch(
+            f"/api/orders/{order.id}/bill/",
+            {"discount_type": "percentage", "discount_value": "10.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.tax_amount, Decimal("2.00"))
+        self.assertEqual(order.service_charge_amount, Decimal("1.00"))
+        self.assertEqual(order.menu_offer_discount_amount, Decimal("4.60"))
+        self.assertEqual(order.discount_amount, Decimal("1.84"))
+        self.assertEqual(order.final_amount, Decimal("16.54"))
+
     def test_manager_cannot_bill_order_before_it_is_served(self):
         order = Order.objects.create(
             table_number=9,
@@ -589,6 +626,23 @@ class ReservationAPITests(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class BillingSettingsAPITests(BaseAPITestCase):
+    def test_manager_can_update_billing_settings_and_waiter_cannot(self):
+        manager_client = self.auth_client(self.manager)
+        response = manager_client.patch(
+            "/api/settings/billing/",
+            {"tax_percentage": "8.50", "service_charge_percentage": "12.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["tax_percentage"])), Decimal("8.50"))
+        self.assertEqual(Decimal(str(response.data["service_charge_percentage"])), Decimal("12.00"))
+
+        waiter_client = self.auth_client(self.waiter)
+        denied = waiter_client.get("/api/settings/billing/")
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class ReportsAPITests(BaseAPITestCase):
     def setUp(self):
         super().setUp()
@@ -600,7 +654,13 @@ class ReportsAPITests(BaseAPITestCase):
         )
         self.served_order.items.create(menu_item=self.menu_item, quantity=3, unit_price=self.menu_item.price)
         self.served_order.recalculate_total()
-        self.served_order.apply_billing(discount_type="amount", discount_value=Decimal("4.97"), billed_by=self.manager)
+        self.served_order.apply_billing(
+            discount_type="amount",
+            discount_value=Decimal("4.97"),
+            tax_percentage=Decimal("0.00"),
+            service_charge_percentage=Decimal("0.00"),
+            billed_by=self.manager,
+        )
         Reservation.objects.create(
             table=self.table,
             guest_name="Report Guest",
@@ -645,6 +705,9 @@ class ReportsAPITests(BaseAPITestCase):
         bills_response = client.get("/api/reports/bills/")
         self.assertEqual(bills_response.status_code, status.HTTP_200_OK)
         self.assertEqual(bills_response.data[0]["order_number"], self.served_order.order_number)
+        self.assertIn("tax_amount", bills_response.data[0])
+        self.assertIn("service_charge_amount", bills_response.data[0])
+        self.assertIn("menu_offer_discount_amount", bills_response.data[0])
         self.assertEqual(Decimal(str(bills_response.data[0]["final_amount"])), Decimal("25.00"))
 
         pdf_response = client.get(f"/api/reports/bills/{self.served_order.id}/pdf/")

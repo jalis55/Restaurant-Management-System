@@ -30,6 +30,7 @@ urlpatterns = [
     path("api/auth/token/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/logout/", LogoutView.as_view(), name="auth_logout"),
     path("api/auth/", include(auth_router.urls)),
+    path("api/settings/", include("apps.preferences.urls")),
     path("api/", include(api_router.urls)),
     path("api/reports/", include("apps.reports.urls")),
 ]

@@ -16,6 +16,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
             "description",
             "price",
             "image",
+            "offer_percentage",
             "is_available",
             "is_featured",
             "preparation_time",

@@ -6,7 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { MiniMetric, Panel, QueueItem, StatCard } from "@/components/section-page-ui";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useOrderEvents } from "@/hooks/use-order-events";
-import { billOrder, listOrders } from "@/lib/api";
+import { billOrder, getBillingSettings, listOrders } from "@/lib/api";
 
 const DEFAULT_FORM = {
   discount_type: "none",
@@ -22,25 +22,45 @@ function parseDiscountValue(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getPreviewTotals(order, form) {
+function getPreviewTotals(order, form, billingSettings) {
   const subtotal = Number(order.total_amount ?? 0);
+  const taxPercentage = parseDiscountValue(billingSettings?.tax_percentage);
+  const serviceChargePercentage = parseDiscountValue(billingSettings?.service_charge_percentage);
   const discountType = form?.discount_type ?? "none";
   const discountValue = parseDiscountValue(form?.discount_value);
+  const taxAmount = (subtotal * taxPercentage) / 100;
+  const serviceChargeAmount = (subtotal * serviceChargePercentage) / 100;
+  const grossAmount = subtotal + taxAmount + serviceChargeAmount;
+  const grossMultiplier = subtotal > 0 ? grossAmount / subtotal : 0;
+
+  const menuOfferDiscountAmount = order.items.reduce((sum, item) => {
+    const itemSubtotal = Number(item.unit_price ?? 0) * Number(item.quantity ?? 0);
+    const itemOfferPercentage = Number(item.offer_percentage ?? 0);
+    return sum + ((itemSubtotal * itemOfferPercentage) / 100) * grossMultiplier;
+  }, 0);
+
+  const baseAfterMenuOffers = Math.max(0, grossAmount - menuOfferDiscountAmount);
 
   let discountAmount = 0;
 
   if (discountType === "amount") {
     discountAmount = discountValue;
   } else if (discountType === "percentage") {
-    discountAmount = (subtotal * discountValue) / 100;
+    discountAmount = (baseAfterMenuOffers * discountValue) / 100;
   }
 
-  const clampedDiscount = Math.max(0, Math.min(subtotal, discountAmount));
-  const netAmount = Math.max(0, subtotal - clampedDiscount);
+  const clampedMenuOfferDiscount = Math.max(0, Math.min(grossAmount, menuOfferDiscountAmount));
+  const clampedDiscount = Math.max(0, Math.min(baseAfterMenuOffers, discountAmount));
+  const netAmount = Math.max(0, baseAfterMenuOffers - clampedDiscount);
 
   return {
     subtotal,
+    taxAmount,
+    serviceChargeAmount,
+    grossAmount,
+    menuOfferDiscountAmount: clampedMenuOfferDiscount,
     discountAmount: clampedDiscount,
+    baseAfterMenuOffers,
     netAmount,
   };
 }
@@ -56,11 +76,11 @@ function sortOrders(orders) {
   return [...orders].sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
 }
 
-function BillingCard({ order, form, busyId, message, onChange, onSubmit }) {
+function BillingCard({ order, form, billingSettings, busyId, message, onChange, onSubmit }) {
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const isBusy = busyId === order.id;
   const isDiscountDisabled = (form?.discount_type ?? DEFAULT_FORM.discount_type) === "none";
-  const preview = getPreviewTotals(order, form);
+  const preview = getPreviewTotals(order, form, billingSettings);
   const billingMeta = order.billed_at
     ? `Billed by ${order.billed_by_name || "Manager"} on ${new Date(order.billed_at).toLocaleString()}`
     : "Awaiting billing";
@@ -74,26 +94,47 @@ function BillingCard({ order, form, busyId, message, onChange, onSubmit }) {
         tone={order.billed_at ? "lime" : "amber"}
       />
 
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-2xl bg-[#f7f7f4] p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Subtotal</p>
           <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.subtotal)}</p>
         </div>
         <div className="rounded-2xl bg-[#f7f7f4] p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Discount preview</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Tax</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.taxAmount)}</p>
+        </div>
+        <div className="rounded-2xl bg-[#f7f7f4] p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Service</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.serviceChargeAmount)}</p>
+        </div>
+        <div className="rounded-2xl bg-[#f7f7f4] p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Menu offers</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.menuOfferDiscountAmount)}</p>
+        </div>
+        <div className="rounded-2xl bg-[#f7f7f4] p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Bill discount</p>
           <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.discountAmount)}</p>
         </div>
         <div className="rounded-2xl bg-[#f7f7f4] p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Net total preview</p>
           <p className="mt-1 text-lg font-semibold text-slate-950">{formatMoney(preview.netAmount)}</p>
         </div>
-        <div className="rounded-2xl bg-[#f7f7f4] p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Discount mode</p>
-          <p className="mt-1 text-lg font-semibold capitalize text-slate-950">{form?.discount_type ?? order.discount_type}</p>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto]">
+        <div className="rounded-2xl border border-black/8 bg-[#f7f7f4] px-4 py-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Tax rule</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{Number(billingSettings?.tax_percentage ?? 0).toFixed(2)}%</p>
+        </div>
+
+        <div className="rounded-2xl border border-black/8 bg-[#f7f7f4] px-4 py-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Service charge rule</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{Number(billingSettings?.service_charge_percentage ?? 0).toFixed(2)}%</p>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Discount type</span>
           <select
@@ -132,6 +173,16 @@ function BillingCard({ order, form, busyId, message, onChange, onSubmit }) {
         </button>
       </div>
 
+      <div className="mt-4 flex flex-wrap gap-2">
+        {order.items
+          .filter((item) => Number(item.offer_percentage) > 0)
+          .map((item) => (
+            <span key={item.id} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-900">
+              {item.menu_item_name} {Number(item.offer_percentage).toFixed(0)}% off
+            </span>
+          ))}
+      </div>
+
       {message ? <p className="mt-3 text-sm text-slate-500">{message}</p> : null}
     </div>
   );
@@ -139,6 +190,7 @@ function BillingCard({ order, form, busyId, message, onChange, onSubmit }) {
 
 function OperationsBillingPage() {
   const { data: orders, error, isLoading, setData: setOrders } = useAsyncData(() => listOrders());
+  const { data: billingSettings, error: billingSettingsError, isLoading: isBillingSettingsLoading } = useAsyncData(() => getBillingSettings());
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [forms, setForms] = useState({});
@@ -233,8 +285,6 @@ function handleFormChange(orderId, event) {
 
   async function handleBill(orderId) {
     const form = forms[orderId] ?? DEFAULT_FORM;
-    const currentOrder = (orders ?? []).find((order) => order.id === orderId);
-    const preview = currentOrder ? getPreviewTotals(currentOrder, form) : null;
     setBusyId(orderId);
     setMessage("");
 
@@ -243,19 +293,11 @@ function handleFormChange(orderId, event) {
         discount_type: form.discount_type,
         discount_value: form.discount_type === "none" ? "0.00" : form.discount_value,
       });
-      const syncedOrder = {
-        ...updatedOrder,
-        discount_type: form.discount_type,
-        discount_value: form.discount_type === "none" ? "0.00" : form.discount_value,
-        discount_amount: preview ? preview.discountAmount.toFixed(2) : updatedOrder.discount_amount,
-        final_amount: preview ? preview.netAmount.toFixed(2) : updatedOrder.final_amount,
-        billed_at: updatedOrder.billed_at ?? new Date().toISOString(),
-      };
 
-      setOrders((currentOrders) => (currentOrders ?? []).map((order) => (order.id === orderId ? syncedOrder : order)));
+      setOrders((currentOrders) => (currentOrders ?? []).map((order) => (order.id === orderId ? updatedOrder : order)));
       setForms((currentForms) => ({
         ...currentForms,
-        [orderId]: createFormState(syncedOrder),
+        [orderId]: createFormState(updatedOrder),
       }));
       setMessage(`Billing saved for ${updatedOrder.order_number}.`);
     } catch (actionError) {
@@ -269,7 +311,7 @@ function handleFormChange(orderId, event) {
     <PageShell
       eyebrow="Operations"
       title="Billing"
-      description="Managers can finalize served orders here, apply a direct or percentage discount, and lock in the net billed amount."
+      description="Managers can finalize served orders here using the global tax and service charge setup, keep menu offers, then add an optional final bill discount."
       stats={[
         <StatCard key="served" label="Served orders" value={String(servedOrders.length)} note="Waiting or completed billing" />,
         <StatCard key="pending" label="Pending billing" value={String(unbilledOrders.length)} note="Served but not finalized" />,
@@ -278,18 +320,35 @@ function handleFormChange(orderId, event) {
     >
       {message ? <div className="mb-4 rounded-2xl border border-black/6 bg-white px-4 py-3 text-sm text-slate-600">{message}</div> : null}
 
-      <DataState isLoading={isLoading} error={error} empty={!servedOrders.length} loadingLabel="Loading billing queue...">
+      <DataState
+        isLoading={isLoading || isBillingSettingsLoading}
+        error={error || billingSettingsError}
+        empty={!servedOrders.length}
+        loadingLabel="Loading billing queue..."
+      >
         <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <Panel eyebrow="Billing queue" title="Served orders ready for manager checkout" description="Pick a served order, choose how the discount should work, and save the final billed amount that should count toward revenue.">
+          <Panel eyebrow="Billing queue" title="Served orders ready for manager checkout" description="Pick a served order, review the global tax and service rules, choose how the final bill discount should work, and save the billed amount.">
             <div className="grid gap-3 md:grid-cols-3">
               <MiniMetric icon={ReceiptText} label="Ready to bill" value={String(unbilledOrders.length)} tone="amber" />
               <MiniMetric icon={DollarSign} label="Net billed" value={formatMoney(billedRevenue)} tone="lime" />
               <MiniMetric icon={Percent} label="Discounted" value={String(billedOrders.filter((order) => Number(order.discount_amount) > 0).length)} tone="blue" />
             </div>
 
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-black/6 bg-[#f7f7f4] px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Global tax</p>
+                <p className="mt-1 text-xl font-semibold text-slate-950">{Number(billingSettings?.tax_percentage ?? 0).toFixed(2)}%</p>
+              </div>
+              <div className="rounded-2xl border border-black/6 bg-[#f7f7f4] px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Global service charge</p>
+                <p className="mt-1 text-xl font-semibold text-slate-950">{Number(billingSettings?.service_charge_percentage ?? 0).toFixed(2)}%</p>
+              </div>
+            </div>
+
             <div className="mt-6 space-y-4">
               {unbilledOrders.map((order) => (
                 <BillingCard
+                  billingSettings={billingSettings}
                   key={order.id}
                   order={order}
                   form={forms[order.id]}
@@ -310,7 +369,7 @@ function handleFormChange(orderId, event) {
                   <QueueItem
                     key={order.id}
                     title={order.order_number}
-                    meta={`Subtotal ${formatMoney(order.total_amount)} · Discount ${formatMoney(order.discount_amount)}`}
+                    meta={`Subtotal ${formatMoney(order.total_amount)} · Tax ${formatMoney(order.tax_amount)} · Service ${formatMoney(order.service_charge_amount)} · Offers ${formatMoney(order.menu_offer_discount_amount)} · Discount ${formatMoney(order.discount_amount)}`}
                     status={formatMoney(order.final_amount)}
                     tone="lime"
                   />

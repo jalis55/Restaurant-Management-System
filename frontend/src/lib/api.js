@@ -109,6 +109,14 @@ async function getCurrentUser() {
   return apiRequest("/api/auth/users/me/");
 }
 
+async function getBillingSettings() {
+  return apiRequest("/api/settings/billing/");
+}
+
+async function updateBillingSettings(payload) {
+  return apiRequest("/api/settings/billing/", { method: "PATCH", body: payload });
+}
+
 async function listUsers() {
   return apiRequest("/api/auth/users/");
 }
@@ -263,6 +271,7 @@ export {
   deleteMenuItem,
   deleteTable,
   deleteUser,
+  getBillingSettings,
   getCurrentUser,
   getBillPdfUrl,
   getBillsReport,
@@ -284,6 +293,7 @@ export {
   refreshSession,
   toggleMenuItemAvailability,
   updateCategory,
+  updateBillingSettings,
   updateMenuItem,
   updateOrderStatus,
   updateReservation,

@@ -14,6 +14,7 @@ import { ReportsRevenuePage } from "@/pages/reports-revenue-page";
 import { ReportsStaffPerformancePage } from "@/pages/reports-staff-performance-page";
 import { ReportsTopItemsPage } from "@/pages/reports-top-items-page";
 import { RoleOverviewPage } from "@/pages/role-overview-page";
+import { SettingsBillingRulesPage } from "@/pages/settings-billing-rules-page";
 import { SettingsProfilePage } from "@/pages/settings-profile-page";
 import { SettingsStaffAccountsPage } from "@/pages/settings-staff-accounts-page";
 import { StaffActiveOrdersPage } from "@/pages/staff-active-orders-page";
@@ -59,6 +60,7 @@ function App() {
           <Route path="reports/bills" element={<ReportsBillsPage />} />
           <Route path="reports/top-items" element={<ReportsTopItemsPage />} />
           <Route path="reports/staff-performance" element={<ReportsStaffPerformancePage />} />
+          <Route path="settings/billing-rules" element={<SettingsBillingRulesPage />} />
           <Route path="settings/staff-accounts" element={<SettingsStaffAccountsPage user={user} />} />
           <Route path="settings/profile" element={<SettingsProfilePage user={user} />} />
           <Route path="staff/orders/new" element={<StaffNewOrderPage />} />

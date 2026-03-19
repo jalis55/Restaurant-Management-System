@@ -19,6 +19,7 @@ const defaultForm = {
   is_available: true,
   is_featured: false,
   name: "",
+  offer_percentage: "0.00",
   preparation_time: 15,
   price: "",
 };
@@ -58,6 +59,7 @@ function MenuItemsPage() {
   const categoryList = categories ?? [];
   const availableCount = itemList.filter((item) => item.is_available).length;
   const featuredCount = itemList.filter((item) => item.is_featured).length;
+  const offeredCount = itemList.filter((item) => Number(item.offer_percentage) > 0).length;
 
   function handleChange(event) {
     const { name, type, checked, value } = event.target;
@@ -82,6 +84,7 @@ function MenuItemsPage() {
       is_available: item.is_available,
       is_featured: item.is_featured,
       name: item.name,
+      offer_percentage: Number(item.offer_percentage ?? 0).toFixed(2),
       preparation_time: item.preparation_time,
       price: item.price,
     });
@@ -136,6 +139,7 @@ function MenuItemsPage() {
       calories: form.calories ? Number(form.calories) : null,
       category: Number(form.category),
       display_order: Number(form.display_order),
+      offer_percentage: form.offer_percentage,
       preparation_time: Number(form.preparation_time),
       price: form.price,
     };
@@ -180,6 +184,7 @@ function MenuItemsPage() {
         <StatCard key="total" label="Items" value={String(itemList.length)} note="Total menu records" />,
         <StatCard key="available" label="Available" value={String(availableCount)} note="Currently sellable" />,
         <StatCard key="featured" label="Featured" value={String(featuredCount)} note="Promoted items" />,
+        <StatCard key="offers" label="With offer" value={String(offeredCount)} note="Discounted menu items" />,
       ]}
     >
       {message ? <div className="mb-4 rounded-2xl border border-black/6 bg-white px-4 py-3 text-sm text-slate-600">{message}</div> : null}
@@ -193,6 +198,7 @@ function MenuItemsPage() {
                     <th className="px-5 py-4 font-medium">Item</th>
                     <th className="px-5 py-4 font-medium">Category</th>
                     <th className="px-5 py-4 font-medium">Price</th>
+                    <th className="px-5 py-4 font-medium">Offer</th>
                     <th className="px-5 py-4 font-medium">Status</th>
                     <th className="px-5 py-4 font-medium">Actions</th>
                   </tr>
@@ -206,6 +212,11 @@ function MenuItemsPage() {
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-600">{item.category_name}</td>
                       <td className="px-5 py-4 text-sm text-slate-950">{item.price}</td>
+                      <td className="px-5 py-4">
+                        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", Number(item.offer_percentage) > 0 ? "bg-sky-100 text-sky-900" : "bg-slate-100 text-slate-600")}>
+                          {Number(item.offer_percentage) > 0 ? `${Number(item.offer_percentage).toFixed(0)}% off` : "No offer"}
+                        </span>
+                      </td>
                       <td className="px-5 py-4">
                         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", item.is_available ? "bg-lime-100 text-lime-900" : "bg-red-100 text-red-900")}>
                           {item.is_available ? "Available" : "Unavailable"}
@@ -248,15 +259,15 @@ function MenuItemsPage() {
           <Panel eyebrow="Highlights" title="Featured and unavailable">
             <div className="space-y-3">
               {itemList
-                .filter((item) => item.is_featured || !item.is_available)
+                .filter((item) => item.is_featured || !item.is_available || Number(item.offer_percentage) > 0)
                 .slice(0, 5)
                 .map((item) => (
                   <QueueItem
                     key={item.id}
                     title={item.name}
-                    meta={`${item.category_name} · Prep ${item.preparation_time} min`}
-                    status={item.is_available ? "Featured" : "Unavailable"}
-                    tone={item.is_available ? "lime" : "red"}
+                    meta={`${item.category_name} · Prep ${item.preparation_time} min${Number(item.offer_percentage) > 0 ? ` · ${Number(item.offer_percentage).toFixed(0)}% offer` : ""}`}
+                    status={!item.is_available ? "Unavailable" : Number(item.offer_percentage) > 0 ? "Offer live" : "Featured"}
+                    tone={!item.is_available ? "red" : Number(item.offer_percentage) > 0 ? "blue" : "lime"}
                   />
                 ))}
             </div>
@@ -309,9 +320,10 @@ function MenuItemsPage() {
                 <textarea className="min-h-28 w-full rounded-2xl border border-black/8 bg-white px-4 py-3 text-sm outline-none" name="description" onChange={handleChange} value={form.description} />
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {[
                   ["price", "Price", "number"],
+                  ["offer_percentage", "Offer %", "number"],
                   ["preparation_time", "Prep time", "number"],
                   ["calories", "Calories", "number"],
                   ["display_order", "Display order", "number"],
@@ -324,7 +336,7 @@ function MenuItemsPage() {
                       name={name}
                       onChange={handleChange}
                       required={name !== "calories"}
-                      step={name === "price" ? "0.01" : undefined}
+                      step={name === "price" || name === "offer_percentage" ? "0.01" : undefined}
                       type={type}
                       value={form[name]}
                     />

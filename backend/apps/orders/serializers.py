@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
@@ -5,6 +7,7 @@ from apps.accounts.models import UserRole
 from apps.menu.models import MenuItem
 from apps.orders.events import broadcast_order_event
 from apps.orders.models import BillingDiscountType, Order, OrderItem, OrderStatus, OrderType
+from apps.preferences.models import BillingSettings
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -12,8 +15,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ["id", "menu_item", "menu_item_name", "quantity", "unit_price", "notes"]
-        read_only_fields = ["id", "menu_item_name", "unit_price"]
+        fields = ["id", "menu_item", "menu_item_name", "quantity", "unit_price", "offer_percentage", "notes"]
+        read_only_fields = ["id", "menu_item_name", "unit_price", "offer_percentage"]
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -33,6 +36,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_by_name",
             "notes",
             "total_amount",
+            "tax_percentage",
+            "tax_amount",
+            "service_charge_percentage",
+            "service_charge_amount",
+            "menu_offer_discount_amount",
             "discount_type",
             "discount_value",
             "discount_amount",
@@ -50,6 +58,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "status",
             "created_by",
             "total_amount",
+            "tax_percentage",
+            "tax_amount",
+            "service_charge_percentage",
+            "service_charge_amount",
+            "menu_offer_discount_amount",
             "discount_type",
             "discount_value",
             "discount_amount",
@@ -84,6 +97,7 @@ class OrderSerializer(serializers.ModelSerializer):
                 menu_item=menu_item,
                 quantity=item_data["quantity"],
                 unit_price=menu_item.price,
+                offer_percentage=menu_item.offer_percentage,
                 notes=item_data.get("notes", ""),
             )
         order.recalculate_total()
@@ -104,6 +118,7 @@ class OrderSerializer(serializers.ModelSerializer):
                     menu_item=menu_item,
                     quantity=item_data["quantity"],
                     unit_price=menu_item.price,
+                    offer_percentage=menu_item.offer_percentage,
                     notes=item_data.get("notes", ""),
                 )
             instance.recalculate_total()
@@ -143,6 +158,9 @@ class OrderBillingSerializer(serializers.Serializer):
     def validate(self, attrs):
         order = self.context["order"]
         request = self.context["request"]
+        billing_settings = BillingSettings.get_solo()
+        tax_percentage = billing_settings.tax_percentage
+        service_charge_percentage = billing_settings.service_charge_percentage
         discount_type = attrs.get("discount_type", BillingDiscountType.NONE)
         discount_value = attrs.get("discount_value", 0)
 
@@ -158,8 +176,15 @@ class OrderBillingSerializer(serializers.Serializer):
         if discount_type == BillingDiscountType.NONE and discount_value != 0:
             raise serializers.ValidationError({"discount_value": "Discount value must be 0 when no discount is selected."})
 
-        if discount_type == BillingDiscountType.AMOUNT and discount_value > order.total_amount:
-            raise serializers.ValidationError({"discount_value": "Discount amount cannot exceed the order total."})
+        subtotal = order.total_amount or Decimal("0.00")
+        tax_amount = ((subtotal * tax_percentage) / Decimal("100")).quantize(Decimal("0.01"))
+        service_charge_amount = ((subtotal * service_charge_percentage) / Decimal("100")).quantize(Decimal("0.01"))
+        gross_total = (subtotal + tax_amount + service_charge_amount).quantize(Decimal("0.01"))
+        menu_offer_discount_amount = order.calculate_menu_offer_discount_amount(gross_total)
+        discount_base = max(Decimal("0.00"), gross_total - menu_offer_discount_amount).quantize(Decimal("0.01"))
+
+        if discount_type == BillingDiscountType.AMOUNT and discount_value > discount_base:
+            raise serializers.ValidationError({"discount_value": "Discount amount cannot exceed the bill total after menu offers."})
 
         if discount_type == BillingDiscountType.PERCENTAGE and discount_value > 100:
             raise serializers.ValidationError({"discount_value": "Percentage discount cannot exceed 100%."})
@@ -167,6 +192,8 @@ class OrderBillingSerializer(serializers.Serializer):
         if discount_type in {BillingDiscountType.AMOUNT, BillingDiscountType.PERCENTAGE} and discount_value == 0:
             raise serializers.ValidationError({"discount_value": "Enter a discount value greater than 0."})
 
+        attrs["tax_percentage"] = tax_percentage
+        attrs["service_charge_percentage"] = service_charge_percentage
         attrs["discount_value"] = discount_value
         return attrs
 
@@ -178,6 +205,8 @@ class OrderBillingSerializer(serializers.Serializer):
             order.apply_billing(
                 discount_type=self.validated_data["discount_type"],
                 discount_value=self.validated_data["discount_value"],
+                tax_percentage=self.validated_data["tax_percentage"],
+                service_charge_percentage=self.validated_data["service_charge_percentage"],
                 billed_by=request.user,
             )
         except DjangoValidationError as exc:

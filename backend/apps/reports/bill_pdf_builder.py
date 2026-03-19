@@ -261,6 +261,9 @@ def build_totals_block(order) -> Table:
     totals_inner = flat_table(
         [
             [p("Subtotal",     "money_lbl"), p(f"${order.total_amount:.2f}",    "money_val")],
+            [p("Tax",          "money_lbl"), p(f"${order.tax_amount:.2f}", "money_val")],
+            [p("Service",      "money_lbl"), p(f"${order.service_charge_amount:.2f}", "money_val")],
+            [p("Menu Offers",  "money_lbl"), p(f"-${order.menu_offer_discount_amount:.2f}", "money_val")],
             [p("Discount",     "money_lbl"), p(f"${order.discount_amount:.2f}", "money_val")],
             [hr, hr],
             [p("Final Amount", "money_lbl_b"), p(f"${order.final_amount:.2f}", "money_val_b")],
@@ -290,6 +293,8 @@ def build_totals_block(order) -> Table:
 def build_footer(order) -> Table:
     """Two-column footer: discount info on the left, attribution on the right."""
     discount_info = (
+        f"Tax: {order.tax_percentage:.2f}%  |  "
+        f"Service: {order.service_charge_percentage:.2f}%  |  "
         f"Discount Type: {order.discount_type.title()}  |  "
         f"Discount Value: {order.discount_value:.2f}"
     )

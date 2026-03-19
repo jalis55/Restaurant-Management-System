@@ -152,6 +152,17 @@ const routeCatalog = [
     highlights: ["Team throughput", "Shift coverage", "Service quality"],
   },
   {
+    path: "/settings/billing-rules",
+    label: "Billing Rules",
+    icon: ReceiptText,
+    section: "Settings",
+    roles: ADMIN_ROLES,
+    eyebrow: "Settings",
+    title: "Billing Rules",
+    description: "Set the global tax and service charge that billing will apply automatically to every finalized order.",
+    highlights: ["Global tax", "Global service charge", "Checkout lock"],
+  },
+  {
     path: "/settings/staff-accounts",
     label: "Staff Accounts",
     icon: Users,
