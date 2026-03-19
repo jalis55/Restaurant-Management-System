@@ -146,3 +146,27 @@
 .toast-slide-in {
   animation: toast-slide-in 180ms ease-out;
 }
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(198, 255, 47, 0.22) rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(8, 10, 8, 0.88);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(198, 255, 47, 0.3), rgba(198, 255, 47, 0.14));
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(198, 255, 47, 0.42), rgba(198, 255, 47, 0.2));
+}

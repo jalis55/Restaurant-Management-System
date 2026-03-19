@@ -114,7 +114,7 @@ function DashboardSidebar({ mobileOpen, setMobileOpen }) {
           </div>
 
 
-          <div className="relative mt-6 flex-1 space-y-5 overflow-y-auto pr-1">
+          <div className="sidebar-scroll relative mt-6 flex-1 space-y-5 overflow-y-auto pr-1.5">
             {navigationGroups.map((group) => (
               <div key={group.label}>
                 <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/28">{group.label}</p>
