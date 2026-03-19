@@ -20,7 +20,11 @@ function sortOrders(orders) {
 }
 
 function getWaiterNextStatuses(status) {
-  return getNextOrderStatuses(status).filter((nextStatus) => nextStatus !== "confirmed");
+  if (status === "ready") {
+    return ["served"];
+  }
+
+  return [];
 }
 
 function StaffActiveOrdersPage() {

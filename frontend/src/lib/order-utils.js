@@ -10,9 +10,9 @@ const ORDER_STATUS_LABELS = {
 const ORDER_STATUS_TONES = {
   pending: "blue",
   confirmed: "amber",
-  preparing: "amber",
+  preparing: "orange",
   ready: "lime",
-  served: "slate",
+  served: "emerald",
   cancelled: "red",
 };
 

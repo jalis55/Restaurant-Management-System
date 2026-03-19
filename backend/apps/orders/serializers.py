@@ -118,8 +118,8 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
         request = self.context.get("request")
         user_role = getattr(request.user, "role", None)
 
-        if user_role == UserRole.WAITER and value == OrderStatus.CONFIRMED:
-            raise serializers.ValidationError("Waiters cannot confirm orders.")
+        if user_role == UserRole.WAITER and value != OrderStatus.SERVED:
+            raise serializers.ValidationError("Waiters can only mark ready orders as served.")
 
         if user_role == UserRole.KITCHEN and order.status == OrderStatus.READY:
             raise serializers.ValidationError("Kitchen cannot serve or cancel an order after it is ready.")

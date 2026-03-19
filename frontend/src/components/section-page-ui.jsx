@@ -25,7 +25,9 @@ function QueueItem({ title, meta, status, tone = "slate" }) {
   const tones = {
     slate: "border-black/6 bg-[#f6f6f3] text-slate-700",
     amber: "border-amber-200 bg-amber-50 text-amber-900",
+    orange: "border-orange-200 bg-orange-50 text-orange-900",
     lime: "border-lime-200 bg-lime-50 text-lime-900",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
     red: "border-red-200 bg-red-50 text-red-900",
     blue: "border-sky-200 bg-sky-50 text-sky-900",
   };

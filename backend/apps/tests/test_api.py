@@ -423,6 +423,45 @@ class OrdersAPITests(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("status", response.data)
 
+    def test_waiter_can_serve_ready_order_only(self):
+        order = Order.objects.create(
+            table_number=6,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.READY,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=1, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(
+            f"/api/orders/{order.id}/update_status/",
+            {"status": OrderStatus.SERVED},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.status, OrderStatus.SERVED)
+
+    def test_waiter_cannot_mark_order_as_preparing(self):
+        order = Order.objects.create(
+            table_number=10,
+            order_type=OrderType.DINE_IN,
+            created_by=self.waiter,
+            status=OrderStatus.CONFIRMED,
+        )
+        order.items.create(menu_item=self.menu_item, quantity=1, unit_price=self.menu_item.price)
+        order.recalculate_total()
+
+        waiter_client = self.auth_client(self.waiter)
+        response = waiter_client.patch(
+            f"/api/orders/{order.id}/update_status/",
+            {"status": OrderStatus.PREPARING},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", response.data)
+
     @patch("apps.orders.serializers.broadcast_order_event")
     def test_manager_can_bill_served_order_with_percentage_discount(self, broadcast_event):
         order = Order.objects.create(
